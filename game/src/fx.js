@@ -72,7 +72,7 @@ export class BallVisual {
     asset.position.set(0, -BALL.R, 0);      // the loader rests it on y = 0; centre it
     this.spinG.add(asset);
     this.ballMats = [];
-    asset.traverse((o) => { if (o.isMesh) { o.renderOrder = 10; this.ballMats.push(o.material); } });
+    asset.traverse((o) => { if (!o.isMesh) return; if (o.userData.hull) o.renderOrder = 10; else { o.renderOrder = 11; this.ballMats.push(o.material); } });
     scene.add(this.root);
     this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.0025, 6, 32), new THREE.MeshBasicMaterial({ color: PALETTE.orange, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.halo.renderOrder = 4;
@@ -83,8 +83,10 @@ export class BallVisual {
     this.trail = new Trail(scene);
     this.squash = 0; this.sqA = 0; this.sqT = 9; this.axis = new THREE.Vector3(0, 1, 0);
     this.spinColor = new THREE.Color(0xffffff);
-    this.haloAngle = 0;
+    this.haloAngle = 0; this.flashT = 0;
   }
+  /** A white pop of the halo: the timing cue at the top of a toss. */
+  flash() { this.flashT = 0.25; }
   impact(normal, strength) {
     this.axis.copy(normal).normalize();
     this.sqA = Math.max(this.sqA * Math.exp(-this.sqT * 12), clamp(strength, 0.08, 0.4));
@@ -138,12 +140,13 @@ export class BallVisual {
     // halo: perpendicular to the spin axis, brighter with spin
     const col = this.colorFor(ball.w, ball.v);
     this.spinColor.lerp(col, 1 - Math.exp(-10 * dt));
-    const haloOp = clamp((ws - 60) / 450, 0, 0.75);
-    this.halo.material.opacity = haloOp;
+    let haloOp = clamp((ws - 60) / 450, 0, 0.75);
     this.halo.material.color.copy(this.spinColor);
+    if (this.flashT > 0) { this.flashT -= dt; haloOp = Math.max(haloOp, 0.9 * (this.flashT / 0.25)); this.halo.material.color.setHex(0xffffff); this.halo.scale.setScalar(1.6 - this.flashT); }
+    this.halo.material.opacity = haloOp;
     if (ws > 1) { _a.copy(ball.w).normalize(); this.halo.quaternion.setFromUnitVectors(Z, _a); }
     this.haloAngle += dt * 4;
-    this.halo.scale.setScalar(1 + 0.08 * Math.sin(this.haloAngle * 3));
+    if (!(this.flashT > 0)) this.halo.scale.setScalar(1 + 0.08 * Math.sin(this.haloAngle * 3));
     // ground shadow
     const overTable = Math.abs(ball.p.x) < 0.7625 && Math.abs(ball.p.z) < 1.37 && ball.p.y > tableY;
     const gy = overTable ? tableY + 0.002 : 0.003;
@@ -188,9 +191,22 @@ export class Impacts {
     let made = 0;
     for (const s of this.sparks) {
       if (s.t < 1) continue;
-      s.t = 0; s.life = 0.22 + Math.random() * 0.18;
+      s.t = 0; s.life = 0.22 + Math.random() * 0.18; s.gravity = true;
       s.v.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2).addScaledVector(normal, 2.2).normalize().multiplyScalar(speed * (0.5 + Math.random()));
       s.m.position.copy(point); s.m.material.color.set(color); s.m.visible = true;
+      if (++made >= n) break;
+    }
+  }
+  /** Sparks born on a shell around a point that fly into it: energy gathering. */
+  gather(point, n, color, radius = 0.28) {
+    let made = 0;
+    for (const s of this.sparks) {
+      if (s.t < 1) continue;
+      s.t = 0; s.life = 0.22 + Math.random() * 0.1;
+      _a.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize().multiplyScalar(radius);
+      s.m.position.copy(point).add(_a);
+      s.v.copy(_a).multiplyScalar(-1 / s.life);
+      s.m.material.color.set(color); s.m.visible = true; s.gravity = false;
       if (++made >= n) break;
     }
   }
@@ -217,7 +233,7 @@ export class Impacts {
     for (const s of this.sparks) {
       if (s.t >= 1) continue;
       s.t = Math.min(1, s.t + dt / s.life);
-      s.v.y -= 9.8 * dt; s.v.multiplyScalar(1 - 3 * dt);
+      if (s.gravity !== false) { s.v.y -= 9.8 * dt; s.v.multiplyScalar(1 - 3 * dt); }
       s.m.position.addScaledVector(s.v, dt);
       if (s.v.lengthSq() > 1e-4) { _a.copy(s.m.position).add(s.v); s.m.lookAt(_a); }
       s.m.material.opacity = 1 - s.t;

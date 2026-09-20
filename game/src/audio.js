@@ -109,6 +109,7 @@ export class AudioEngine {
   }
   whoosh(speed) { if (!this.ok()) return; const a = clamp(speed / 12, 0, 1) * 0.3; if (a > 0.02) this.noise(this.t, 0.13, a, { bp: 500, q: 0.8, sweep: 1800 }); }
   toss() { if (!this.ok()) return; this.noise(this.t, 0.02, 0.08, { bp: 3000 }); }
+  tick() { if (!this.ok()) return; this.tone('sine', 1320, this.t, 0.07, 0.11); this.tone('sine', 1980, this.t + 0.02, 0.05, 0.05); }
   ui() { if (!this.ok()) return; this.tone('sine', 880, this.t, 0.05, 0.08); }
 
   chargeStart() {
@@ -151,6 +152,7 @@ export class AudioEngine {
     if (silent) return;
     // the crack of the wrist, the blade passing, the body behind it
     const t = this.t, a = 0.3 + 0.7 * power;
+    if (power > 0.85) { this.tone('sine', 62, t, 0.3, 0.4, { f1: 30, send: 0.5 }); this.noise(t, 0.12, 0.3, { lp: 400 }); }
     this.noise(t, 0.012, 0.5 * a, { bp: 2400, q: 1.2 });
     this.noise(t + 0.01, 0.2, 0.32 * a, { bp: 2200, q: 0.7, sweep: 350 });
     this.tone('sine', 110, t, 0.08, 0.25 * a, { f1: 60 });

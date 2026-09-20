@@ -63,6 +63,7 @@ export class UI {
     this.e.chargef.style.transform = `scaleX(${level.toFixed(3)})`;
     this.e.charge.classList.toggle('full', level >= 0.999);
   }
+  focus(level) { this.e.vig.style.opacity = Math.max(this.e.gp.classList.contains('on') ? 1 : 0, level * 0.7); }
   flash(color = 'rgba(255,255,255,0.35)') { const f = this.e.flash; f.style.background = color; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
   showOver(win, score, stats) {
     this.e.overh.textContent = win ? 'GAME' : 'GAME · CPU';

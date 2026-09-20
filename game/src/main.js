@@ -40,7 +40,7 @@ const G = {
   serveX: 0, events: [], time: 0, running: false, ballLive: false, reachZ: null, touch: false,
   camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
   shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
-  lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [],
+  lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [], gatherT: 0, focus: 1, apexCued: false,
   ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [],
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
@@ -105,7 +105,7 @@ const hooks = {
   release() {
     if (!G.running) return;
     const p = G.paddle.release(G.match.state === 'TOSS' ? SERVE.power : 1);
-    if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; }
+    if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; if (p > 0.85) G.shake = Math.max(G.shake, 0.012); }
   },
   toss() {
     if (!G.running) return;
@@ -129,15 +129,26 @@ const hooks = {
 function handPos(out, x) { return out.set(x, TABLE.H + SERVE.handY, SERVE.handZ); }
 
 function setupPaddleVisuals() {
-  G.padVis = [];
+  G.padVis = []; G.bladeG = [];
   for (let i = 0; i < 2; i++) {
     const inst = G.arena.paddles[i];
-    const pivot = new THREE.Group();
+    const pivot = new THREE.Group(), bladeG = new THREE.Group();
     const cy = inst.userData.blade ? inst.userData.blade.centerY : PADDLE.centerY;
     inst.position.set(0, -cy, 0);
-    pivot.add(inst);
+    bladeG.add(inst); pivot.add(bladeG);
     scene.add(pivot);
-    G.padVis.push(pivot);
+    G.padVis.push(pivot); G.bladeG.push(bladeG);
+  }
+  // the player's hand grips the handle; the forearm runs down and toward the camera
+  if (G.arena.hand) {
+    const hp = new THREE.Group();
+    const gripMid = G.arena.paddles[0].userData.blade ? G.arena.paddles[0].userData.blade.gripMidY : -0.124;
+    hp.position.set(0, gripMid, 0);
+    const gy = G.arena.hand.userData.hand ? G.arena.hand.userData.hand.gripY : 0.375;
+    G.arena.hand.position.set(0, -gy, 0);
+    hp.add(G.arena.hand);
+    G.padVis[0].add(hp);
+    G.handPivot = hp;
   }
   // two fading ghosts of the blade, shown during the forward swing
   for (let k = 0; k < 2; k++) {
@@ -146,8 +157,11 @@ function setupPaddleVisuals() {
     scene.add(gm); G.ghosts.push(gm);
   }
   for (let k = 0; k < 3; k++) G.padHist.push(new THREE.Matrix4());
-  G.chargeRing = new THREE.Mesh(new THREE.RingGeometry(0.105, 0.118, 48), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-  G.chargeRing.renderOrder = 4;
+  // an arc around the blade that fills as the swing winds up, vertex-coloured so it costs one draw
+  const ringGeo = new THREE.RingGeometry(0.108, 0.122, 64, 1);
+  ringGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(ringGeo.attributes.position.count * 3), 3));
+  G.chargeRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 1, depthWrite: false, depthTest: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  G.chargeRing.renderOrder = 12; G.chargeRing.visible = false;
   G.padVis[0].add(G.chargeRing);
   G.playerRubber = [];
   G.arena.paddles[0].traverse((o) => { if (o.isMesh && !o.userData.hull && o.material.name === 'fabric') G.playerRubber.push(o.material); });
@@ -211,9 +225,9 @@ function frame(tMs) {
 function idle(dt, now) {
   if (G.hasPointer && !G.input.touch) projectPointer();
   G.paddle.update(dt);
-  updatePaddleVisual(G.padVis[0], G.paddle.pos, G.paddle.normal, 1 - G.paddle.flip);
-  if (G.bot) updatePaddleVisual(G.padVis[1], G.bot.visualPos(_a), G.bot.normal, G.bot.flip);
-  else updatePaddleVisual(G.padVis[1], _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 0);
+  updatePaddleVisual(0, G.paddle.pos, G.paddle.normal, -1, G.paddle.flip);
+  if (G.bot) updatePaddleVisual(1, G.bot.visualPos(_a), G.bot.normal, 1, G.bot.flip);
+  else updatePaddleVisual(1, _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 1, 0);
   G.ballVis.update(dt, G.ball, now, true, TABLE.H);
   G.fx.update(dt);
   G.cloth.update(dt);
@@ -234,12 +248,23 @@ function update(dt, now, realDt) {
   // paddles
   paddle.reachZ = G.reachZ;
   if (paddle.charging) G.audio.chargeLevel(paddle.charge);
-  paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && (match.lastHitter === 1 || match.state === 'TOSS') ? ball : null, match.state === 'TOSS' && match.server === 0);
-  bot.update(dt, ball, match, now, paddle.pos.x, G.events);
+  const serving = match.state === 'TOSS' && match.server === 0;
+  if (serving && G.ballLive) {
+    // the blade is drawn to the tossed ball, and the top of the toss is called out
+    const dx = ball.p.x - paddle.target.x, dy = ball.p.y - paddle.target.y;
+    if (Math.abs(dx) < 0.2 && Math.abs(dy) < 0.24) paddle.setTarget(paddle.target.x + dx * 0.65, paddle.target.y + dy * 0.65);
+    if (!G.apexCued && ball.v.y < 0.35) { G.apexCued = true; G.audio.tick(); G.ballVis.flash(); }
+  } else G.apexCued = false;
+  paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && (match.lastHitter === 1 || match.state === 'TOSS') ? ball : null, serving);
+  // winding up slows the world: focus. The paddle keeps real time, everything else dilates.
+  const focusT = paddle.charging ? 1 - 0.32 * paddle.charge : 1;
+  G.focus += (focusT - G.focus) * (1 - Math.exp(-14 * dt));
+  const gdt = dt * G.focus;
+  bot.update(gdt, ball, match, now, paddle.pos.x, G.events);
   if (match.state === 'TOSS' && match.server === 1) G.ballLive = true;
   // physics
   if (G.ballLive) {
-    stepWorld(ball, [paddle], dt, G.events, Math.random);
+    stepWorld(ball, [paddle], gdt, G.events, Math.random);
     if (ball.netHold) G.cloth.press(ball.p.x, ball.p.y, ball.netHold, Math.abs(ball.p.z));
     const out = match.checkOut(ball);
     if (out) handleOutcome(out, now);
@@ -252,24 +277,25 @@ function update(dt, now, realDt) {
   }
   for (const e of G.events) handleEvent(e, now);
   G.events.length = 0;
-  const tr = match.update(dt);
+  const tr = match.update(gdt);
   if (tr === 'serve') onNewServe();
   if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; document.body.classList.remove('playing'); G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
   // whoosh on a fast swing
   if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
   // visuals: the player sees the red side of their own blade; the wrist cocks while charging
-  updatePaddleVisual(G.padVis[0], paddle.pos, paddle.normal, 1 - paddle.flip, paddle.cock(), paddle.charge >= 0.999 && paddle.charging);
-  updatePaddleVisual(G.padVis[1], bot.visualPos(_a), bot.normal, bot.flip);
+  updatePaddleVisual(0, paddle.pos, paddle.normal, -1, paddle.flip, paddle.cock(), paddle.charge >= 0.999 && paddle.charging);
+  updatePaddleVisual(1, bot.visualPos(_a), bot.normal, 1, bot.flip);
   updateGhosts(paddle);
   const ch = paddle.charging ? paddle.charge : 0;
-  G.chargeRing.material.opacity = ch * 0.85 + (ch >= 0.999 ? 0.15 * Math.sin(G.time * 30) : 0);
-  G.chargeRing.scale.setScalar(0.75 + 0.55 * ch);
-  for (const m of G.playerRubber) { m.emissive.setHex(PALETTE.cyan); m.emissiveIntensity = ch * 0.55; }
+  updateChargeRing(ch, paddle.charging);
+  for (const m of G.playerRubber) { m.emissive.setHex(ch >= 0.999 ? PALETTE.orange : PALETTE.cyan); m.emissiveIntensity = ch * 0.35 + (ch >= 0.999 ? 0.15 + 0.1 * Math.sin(G.time * 24) : 0); }
+  if (paddle.charging && G.time - G.gatherT > 0.07) { G.gatherT = G.time; G.fx.gather(paddle.pos, 1 + Math.round(ch * 3), ch >= 0.999 ? PALETTE.orange : PALETTE.cyan, 0.22 + 0.1 * ch); }
   G.ui.charge(ch, paddle.charging);
+  G.ui.focus(ch);
   const showBall = G.ballLive || G.holdingBall || match.state === 'SERVE_WAIT';
-  G.ballVis.update(dt, ball, now, showBall, TABLE.H);
+  G.ballVis.update(gdt, ball, now, showBall, TABLE.H);
   G.fx.update(dt);
-  G.cloth.update(dt);
+  G.cloth.update(gdt);
   const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
   G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
   G.arena.setLevel(rallyLvl);
@@ -431,20 +457,45 @@ function handleOutcome(res, now) {
   }
 }
 
-function updatePaddleVisual(pivot, pos, normal, flip, cock = 0, tremble = false) {
+const _ringCol = new THREE.Color();
+function updateChargeRing(ch, charging) {
+  const ring = G.chargeRing;
+  ring.visible = charging && ch > 0.02;
+  if (!ring.visible) return;
+  const geo = ring.geometry, col = geo.attributes.color, n = col.count;
+  _ringCol.setHex(PALETTE.cyan).lerp(new THREE.Color(PALETTE.orange), ch * ch);
+  const pulse = ch >= 0.999 ? 0.6 + 0.4 * Math.abs(Math.sin(G.time * 18)) : 1;
+  // RingGeometry lays vertices out ring by ring around theta; two rings of 65 vertices each
+  const per = n / 2;
+  for (let i = 0; i < n; i++) {
+    const f = (i % per) / (per - 1);
+    const lit = f <= ch ? pulse : (f - ch < 0.03 ? 0.4 : 0);
+    col.setXYZ(i, _ringCol.r * lit, _ringCol.g * lit, _ringCol.b * lit);
+  }
+  col.needsUpdate = true;
+}
+
+/**
+ * faceToward: +1 shows the red face along the normal (the far side), -1 shows it to the player.
+ * flip 0..1 turns the blade in the hand for a backhand; the handle leans toward the hand.
+ */
+function updatePaddleVisual(i, pos, normal, faceToward, flip, cock = 0, tremble = false) {
+  const pivot = G.padVis[i];
   pivot.position.copy(pos);
   _n.copy(normal).normalize();
-  _u.copy(UP).addScaledVector(_n, -_n.y).normalize();
-  const th = flip * Math.PI;
-  _f.copy(_n).multiplyScalar(Math.cos(th)).addScaledVector(_c.crossVectors(_u, _n), Math.sin(th));
+  _f.copy(_n).multiplyScalar(faceToward);
   _b.copy(pos).add(_f);
   pivot.up.set(0, 1, 0);
   pivot.lookAt(_b);
+  const side = 1 - 2 * flip;                       // +1 forehand, -1 backhand
+  pivot.rotateZ((i === 0 ? 1 : -1) * side * 0.55);   // the handle leans toward the hand
+  G.bladeG[i].rotation.y = flip * Math.PI;         // the other face comes round on a backhand
+  if (i === 0 && G.handPivot) G.handPivot.rotation.set(-0.95, 0, 0.2 * side);
   if (cock > 0) {
     // the wrist cocks: the blade tilts back and swings out to the side, then whips through
-    pivot.rotateX(-0.55 * cock);
-    pivot.rotateZ(0.35 * cock);
-    pivot.position.addScaledVector(_c.crossVectors(_u, _n), 0.05 * cock).y += 0.02 * cock;
+    pivot.rotateX(-0.85 * cock);
+    pivot.rotateZ(0.5 * cock);
+    pivot.position.addScaledVector(_c.crossVectors(_u, _n), 0.07 * cock).y += 0.03 * cock;
   }
   if (tremble) { pivot.position.x += (Math.random() - 0.5) * 0.006; pivot.position.y += (Math.random() - 0.5) * 0.006; }
 }
@@ -485,12 +536,12 @@ function updateCamera(dt) {
   const px = G.running ? p.pos.x : 0;
   const bx = G.ballLive ? clamp(G.ball.p.x, -1, 1) : 0;
   const ch = p.charging ? p.charge : 0;
-  _camT.copy(G.camBase).add(_a.set(px * 0.05 + bx * 0.04, -0.04 * ch, 0.08 * ch));
+  _camT.copy(G.camBase).add(_a.set(px * 0.05 + bx * 0.04, -0.05 * ch, -0.14 * ch));
   _lookT.copy(G.lookBase).add(_a.set(px * 0.03 + bx * 0.1, 0, 0));
   const k = 1 - Math.exp(-6 * dt);
   camera.position.lerp(_camT, k); G.look.lerp(_lookT, k);
   const rallyZoom = clamp((G.match.rally - 4) / 12, 0, 1) * 4;
-  const fov = G.fovBase - rallyZoom - ch * 2.5 + G.camKick;
+  const fov = G.fovBase - rallyZoom - ch * 4 + G.camKick + (ch >= 0.999 ? 1.2 * Math.abs(Math.sin(G.time * 9)) : 0);
   camera.fov += (fov - camera.fov) * (1 - Math.exp(-8 * dt));
   camera.updateProjectionMatrix();
   camera.lookAt(G.look);

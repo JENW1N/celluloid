@@ -8,7 +8,7 @@ import { ASSET } from '../assetlib.js';
 import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js';
 import { TABLE, PALETTE, clamp } from './consts.js';
 
-export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'scoreboard_flip', 'ball_bucket', 'towel_box'];
+export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'hand', 'ball', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'scoreboard_flip', 'ball_bucket', 'towel_box'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
@@ -42,6 +42,26 @@ export function instanceAsset(scene, inst, transforms, { outline = 0, colorFor =
     made.push({ im, hull, local: mesh.matrixWorld.clone() });
   }
   return made;
+}
+
+function makeRubberTexture() {
+  // the extruded ellipse's UVs are its shape coordinates in metres; repeat/offset map the
+  // 0.071 x 0.0735 topsheet onto the canvas
+  const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S;
+  const x = c.getContext('2d');
+  const rim = x.createRadialGradient(S * 0.5, S * 0.5, S * 0.1, S * 0.5, S * 0.5, S * 0.52);
+  rim.addColorStop(0, '#f4f4f4'); rim.addColorStop(0.75, '#e2e2e2'); rim.addColorStop(1, '#9a9a9a');
+  x.fillStyle = rim; x.fillRect(0, 0, S, S);
+  const hi = x.createRadialGradient(S * 0.36, S * 0.3, 0, S * 0.36, S * 0.3, S * 0.3);
+  hi.addColorStop(0, 'rgba(255,255,255,0.55)'); hi.addColorStop(0.5, 'rgba(255,255,255,0.18)'); hi.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = hi; x.fillRect(0, 0, S, S);
+  x.fillStyle = 'rgba(0,0,0,0.16)';
+  for (let j = 3; j < S; j += 6) for (let i = 3 + ((j / 6) % 2) * 3; i < S; i += 6) { x.beginPath(); x.arc(i, j, 1.1, 0, Math.PI * 2); x.fill(); }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1 / (2 * 0.071), 1 / (2 * 0.0735)); t.offset.set(0.5, 0.5);
+  t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function makeNetTexture() {
@@ -111,11 +131,19 @@ export async function buildArena(scene, { phone = false } = {}) {
   out.net.position.set(0, TABLE.H, 0);
   scene.add(out.net);
   out.paddles = [];
+  const rubber = makeRubberTexture();
   for (let i = 0; i < 2; i++) {
-    const p = toonify(await ASSET('./assets/paddle.js', { keepHierarchy: true }), { outline: 0.0035 });
-    if (i === 0) p.traverse((o) => { if (o.isMesh && !o.userData.hull) o.material = o.material.clone(); });
+    const p = toonify(await ASSET('./assets/paddle.js', { keepHierarchy: true }), { outline: 0.0028 });
+    p.traverse((o) => {
+      if (!o.isMesh || o.userData.hull) return;
+      o.material = o.material.clone();
+      // the topsheets get a surface: a painted highlight, a darker rim, pimple grain
+      const hex = o.material.userData.srcColor;
+      if (hex === 0xe0262d || hex === 0x1b1b21) { o.material.map = rubber; o.material.needsUpdate = true; }
+    });
     out.paddles.push(p);
   }
+  out.hand = toonify(await ASSET('./assets/hand.js', { keepHierarchy: true }), { outline: 0.0028 });
   out.ball = toonify(await ASSET('./assets/ball.js'), { outline: 0.0022 });
 
   // surrounds
