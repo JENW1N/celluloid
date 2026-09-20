@@ -273,14 +273,18 @@ function applyAssist(isServe) {
   const speed = b.v.length();
   if (speed < 0.8) return 'none';
   const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl), ph0 = Math.atan2(b.v.x, b.v.z);
-  const maxA = cfg.assistAngle;
+  // a slow ball carries no skill premium: below 7 m/s the lower levels may bend it further, and
+  // push it a little harder, so a block met low becomes a lob instead of a pop-up
+  const slow = !isServe && speed < 7 && cfg.assistAngle >= 0.15;
+  const maxA = slow ? Math.max(cfg.assistAngle, 0.55) : cfg.assistAngle;
   // candidates: a little elevation, a little less pace, a touch of the topspin a real stroke
   // would have brushed on, and a nudge of direction. Cheapest change that lands wins.
   const spinMax = cfg.assistSpin || 0;
   const cand = [];
-  const ths = [0, 0.015, -0.015, 0.03, -0.03, 0.05, -0.05, 0.08, -0.08, 0.12, -0.12, 0.17, -0.17, 0.23, -0.23, 0.3, -0.3].filter((d) => Math.abs(d) <= maxA + 1e-6);
+  const ths = [0, 0.015, -0.015, 0.03, -0.03, 0.05, -0.05, 0.08, -0.08, 0.12, -0.12, 0.17, -0.17, 0.23, -0.23, 0.3, -0.3, 0.4, -0.4, 0.55, -0.55].filter((d) => Math.abs(d) <= maxA + 1e-6);
   const spins = [0, 120, 260, 420].filter((w) => w <= spinMax + 1e-6);
   const sfs = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 1.08].filter((f) => f >= (cfg.assistPace || 0.95) - 1e-6);
+  if (slow) sfs.push(1.25, 1.45, 1.7);
   for (const dth of ths) for (const dw of spins) for (const sf of sfs) if (dth !== 0 || dw !== 0 || sf !== 1) cand.push({ dth, dph: 0, dw, sf, cost: Math.abs(dth) + dw * 0.0003 + Math.abs(1 - sf) * 0.5 });
   for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.05, -0.05]) cand.push({ dth, dph, dw: 0, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
   cand.sort((x, y) => x.cost - y.cost);
@@ -447,6 +451,7 @@ function telemetry() {
   g.draws = r.calls; g.tris = r.triangles;
   g.ball = [G.ball.p.x, G.ball.p.y, G.ball.p.z]; g.ballv = [G.ball.v.x, G.ball.v.y, G.ball.v.z]; g.spin = G.ball.w.length();
   g.level = G.level; g.server = m.server; g.match = m.state; g.live = G.ballLive;
+  g.last = m.lastPoint ? (m.lastPoint.let ? ['let'] : [m.lastPoint.winner, m.lastPoint.reason, m.lastPoint.rally]) : null;
   if (G.ui.e.perf.classList.contains('on')) G.ui.perf(`${fpsShow} fps · ${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris`);
 }
 

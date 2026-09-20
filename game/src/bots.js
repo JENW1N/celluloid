@@ -74,14 +74,19 @@ export class Bot {
 
   planReturn(ball, now, fresh, match) {
     const cfg = this.cfg;
+    // if the ball has already bounced on our side, the flight we are reading starts now and the
+    // next table contact is the second bounce, which ends the point
+    const bounced = match.bounces[1] === 1;
     const r = predict(ball, {
       maxT: 2.6, sample: true,
-      until: (b, t, ev) => b.p.z < -2.6 || ev.filter((x) => x.type === 'table').length >= 2 || ev.some((x) => x.type === 'netin' || x.type === 'floor'),
+      until: (b, t, ev) => b.p.z < -2.6 || ev.filter((x) => x.type === 'table').length >= (bounced ? 1 : 2) || ev.some((x) => x.type === 'netin' || x.type === 'floor'),
     });
-    const tables = r.events.filter((e) => e.type === 'table');
-    const first = tables[0];
-    if (!first || first.side !== 1) { this.plan = null; return; }
-    const tb = first.t;
+    let tb = 0;
+    if (!bounced) {
+      const first = r.events.find((e) => e.type === 'table');
+      if (!first || first.side !== 1) { this.plan = null; return; }
+      tb = first.t;
+    }
     const second = r.events.find((e) => e.t > tb && (e.type === 'table' || e.type === 'floor' || e.type === 'netin'));
     const t2 = second ? second.t : r.t;
     const after = r.samples.filter((s) => s.t > tb && s.t < t2);

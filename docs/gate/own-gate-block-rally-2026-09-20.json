@@ -1,0 +1,84 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-20T22:04:46.485Z",
+  "desktop": true,
+  "level": "rookie",
+  "style": "block",
+  "ready_s": 2.231,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 28.55,
+  "contacts": 26,
+  "longest_rally": 15,
+  "points": 9,
+  "score": [
+    4,
+    5
+  ],
+  "samples": 1556,
+  "log": [
+    "YOU DOUBLE BOUNCE r3 1-0",
+    "YOU DOUBLE BOUNCE r15 2-0",
+    "CPU NET r0 2-1",
+    "CPU SERVE FAULT r0 2-2",
+    "YOU DOUBLE BOUNCE r7 3-2",
+    "YOU DOUBLE BOUNCE r7 4-2",
+    "CPU NET r0 4-3",
+    "CPU SERVE FAULT r0 4-4",
+    "CPU OUT r7 4-5"
+  ],
+  "final": {
+    "pos": [
+      -3.4403616713761815e-35,
+      0.9199999999999997
+    ],
+    "fps": 240,
+    "speed": 0,
+    "score": [
+      4,
+      5
+    ],
+    "over": false,
+    "draws": 116,
+    "tris": 247748,
+    "rally": 0,
+    "hits": 26,
+    "state": "PLAY",
+    "ball": [
+      0.07040108683857327,
+      0.88,
+      -1.55
+    ],
+    "paddleZ": 1.62,
+    "points": 9,
+    "ballv": [
+      0,
+      0,
+      0
+    ],
+    "spin": 0,
+    "level": "rookie",
+    "server": 1,
+    "match": "SERVE_WAIT",
+    "live": false,
+    "last": [
+      1,
+      "OUT",
+      7
+    ]
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.573,
+    10.066,
+    17.585,
+    25.075,
+    32.584,
+    40.057,
+    47.578,
+    55.07
+  ],
+  "fails": [],
+  "result": "PASS"
+}
