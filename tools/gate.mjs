@@ -2,7 +2,7 @@
 /**
  * CELLULOID's own gate. The recipe's playtest drives forward; this one plays table tennis.
  *
- *   node tools/gate.mjs <url> [--out=_gate] [--seconds=50] [--desktop] [--level=rookie]
+ *   node tools/gate.mjs <url> [--out=_gate] [--seconds=50] [--desktop] [--level=rookie] [--style=charge|block]
  *
  * A 390x844 phone viewport with real touches (or a laptop viewport with a real mouse and keys
  * under --desktop). It steers by telemetry, reading __GAME__.ball to know where the ball is, but
@@ -37,6 +37,7 @@ const DESKTOP = process.argv.includes('--desktop');
 const OUT = path.resolve(arg('out', '_gate'));
 const SECONDS = Number(arg('seconds', 50));
 const LEVEL = arg('level', 'rookie');
+const STYLE = arg('style', 'charge');      // charge: draw back on every return; block: never charge, just meet the ball
 fs.mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -138,7 +139,7 @@ while (Date.now() - start < SECONDS * 1000) {
       if (y < 0.78 && vyy < 0 && Math.abs(x) < 0.7625 && Math.abs(z) < 1.37) { y = 0.78; vyy = -vyy * 0.9; }
     }
     want = { x, y: Math.max(0.5, Math.min(2.0, y)) };
-    if (bz > -0.4 && bz < plane - 0.5) await chargeOn();
+    if (STYLE === 'charge' && bz > -0.4 && bz < plane - 0.5) await chargeOn();
     if (bz >= plane - 0.5) await chargeOff();
   } else if (g.match === 'TOSS' && g.server === 0 && g.live) {
     // our serve: follow the tossed ball, hold, and let go as it drops onto the blade
@@ -193,7 +194,7 @@ if (stats.rally < 1) fails.push('no legal return ever landed');
 if (stats.points < 4) fails.push(`only ${stats.points} point(s) decided, needs 4`);
 if (errors.length) fails.push(`${errors.length} console error(s): ${errors[0]}`);
 if (missing.length) fails.push(`${missing.length} 404(s): ${missing[0]}`);
-const verdict = { url, utc: new Date().toISOString(), desktop: DESKTOP, level: LEVEL, ready_s: readyS, tapped, startGone, moved_m: +moved.toFixed(2), contacts: stats.contacts, longest_rally: stats.rally, points: stats.points, score: stats.score, samples: stats.samples, final: last, errors, missing, frames: frameTimes, fails, result: fails.length ? 'FAIL' : 'PASS' };
+const verdict = { url, utc: new Date().toISOString(), desktop: DESKTOP, level: LEVEL, style: STYLE, ready_s: readyS, tapped, startGone, moved_m: +moved.toFixed(2), contacts: stats.contacts, longest_rally: stats.rally, points: stats.points, score: stats.score, samples: stats.samples, final: last, errors, missing, frames: frameTimes, fails, result: fails.length ? 'FAIL' : 'PASS' };
 fs.writeFileSync(path.join(OUT, 'verdict.json'), JSON.stringify(verdict, null, 2));
 console.log(`=== CELLULOID GATE (${DESKTOP ? 'laptop, mouse and keys' : 'phone, real touch'}) ===`);
 console.log(`url         ${url}`);
