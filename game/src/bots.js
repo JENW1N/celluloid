@@ -186,7 +186,7 @@ export class Bot {
   visualPos(out) { return out.copy(this.pos).addScaledVector(this.swingV, this.swingOff); }
 
   serveWait(dt, ball, match, ev) {
-    if (this.servePhase === 'idle') { this.servePhase = 'wait'; this.serveTimer = rr(1.0, 1.8); this.serveX = rr(-0.5, 0.5); }
+    if (this.servePhase === 'idle') { this.servePhase = 'wait'; this.serveTimer = rr(1.0, 1.8) + (match.totalPoints === 0 ? 1.6 : 0); this.serveX = rr(-0.5, 0.5); }
     _hand.set(this.serveX, TABLE.H + 0.12, -SERVE.handZ);
     ball.set(_hand, ZERO);
     this.pos.lerp(_tmp.set(this.serveX + 0.26, TABLE.H + 0.22, -SERVE.handZ - 0.12), 1 - Math.exp(-5 * dt));

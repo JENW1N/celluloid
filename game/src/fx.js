@@ -71,6 +71,8 @@ export class BallVisual {
     this.root.add(this.squashG); this.squashG.add(this.spinG);
     asset.position.set(0, -BALL.R, 0);      // the loader rests it on y = 0; centre it
     this.spinG.add(asset);
+    this.ballMats = [];
+    asset.traverse((o) => { if (o.isMesh) { o.renderOrder = 10; this.ballMats.push(o.material); } });
     scene.add(this.root);
     this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.0025, 6, 32), new THREE.MeshBasicMaterial({ color: PALETTE.orange, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.halo.renderOrder = 4;
@@ -107,6 +109,10 @@ export class BallVisual {
     this.root.visible = visible; this.shadow.visible = visible;
     if (!visible) { this.trail.clear(); this.halo.material.opacity = 0; return; }
     this.root.position.copy(ball.p);
+    // in the last half metre before the player's blade the ball is drawn over it, so the
+    // contact you are timing is never hidden behind your own paddle
+    const onTop = ball.p.z > 1.05;
+    for (const m of this.ballMats) if (m.depthTest === onTop) { m.depthTest = !onTop; m.needsUpdate = true; }
     // spin: real axis, capped visual rate so direction reads instead of strobing
     const ws = ball.w.length();
     if (ws > 1) {

@@ -1,0 +1,19 @@
+=== 404 JAM VERDICT ===
+url             http://localhost:9000/__game__/game/
+utc             2026-09-20T20:52:47.734Z
+commit          local
+viewport        390x844 @3x phone, real touch, Android Chrome UA
+network         4G: 4 Mbps down, 1 Mbps up, 60 ms latency, CPU 2x slower
+ready           3.4 s   budget 20 s   PASS
+weight          1.5 MB   budget 10 MB   PASS
+started         yes (tap on #startb)
+moved           1.2 m   needs 1 m   PASS
+peak draws      112   budget 900   PASS
+peak tris       243,744   budget 1,500,000   PASS
+median fps      240 (ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 (0x00002B85) Direct3D11 vs_5_0 ps_5_0, D3D11))
+errors          0   PASS
+404s            0   PASS
+external deps   none   cdn: cdn.jsdelivr.net
+outside folder  none, every file came from the game folder
+RESULT: PASS
+=== END ===

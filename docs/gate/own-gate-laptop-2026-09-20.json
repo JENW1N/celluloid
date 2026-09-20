@@ -1,0 +1,66 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-20T21:53:23.973Z",
+  "desktop": true,
+  "level": "rookie",
+  "ready_s": 2.326,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 14.65,
+  "contacts": 11,
+  "longest_rally": 1,
+  "points": 13,
+  "score": [
+    2,
+    11
+  ],
+  "samples": 1243,
+  "final": {
+    "pos": [
+      -0.0005904270961500284,
+      0.9184494993126908
+    ],
+    "fps": 240,
+    "speed": 3.0779109440346666,
+    "score": [
+      2,
+      11
+    ],
+    "over": true,
+    "draws": 108,
+    "tris": 247216,
+    "rally": 0,
+    "hits": 11,
+    "state": "PLAY",
+    "ball": [
+      -0.10686813140292724,
+      0.08162153085590301,
+      2.112942583877751
+    ],
+    "paddleZ": 1.5780007616119214,
+    "points": 13,
+    "ballv": [
+      0.02534650096510117,
+      2.1635882904486676,
+      2.1890132580070434
+    ],
+    "spin": 109.32584308676986,
+    "level": "rookie",
+    "server": 1,
+    "match": "GAME_OVER",
+    "live": true
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.576,
+    10.07,
+    17.566,
+    25.102,
+    32.584,
+    40.053,
+    47.557
+  ],
+  "fails": [],
+  "result": "PASS"
+}

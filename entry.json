@@ -1,0 +1,16 @@
+{
+  "title": "CELLULOID",
+  "slug": "celluloid",
+  "team": ["GITHUB_HANDLE"],
+  "play_url": "https://GITHUB_HANDLE.github.io/celluloid/game/",
+  "source_url": "https://github.com/GITHUB_HANDLE/celluloid",
+  "commit": "COMMIT_SHA",
+  "genre": "other",
+  "agent": "Claude Code",
+  "models": ["Claude Fable 5.1 (claude-fable-5-1) wrote the code, the assets and the critiques", "no image or sound generator: every sound is synthesised at runtime from the physics"],
+  "own_art": false,
+  "own_art_list": [],
+  "what_i_found": "The paddle is a real racket, not a bat: a hollow 2.7 g ball with drag and spin-parameter Magnus lift meets competition rubber modelled as grip, slip and tangential restitution, so a flick of the mouse at contact is a brush and a brush is spin you can see in the ball's band and trail. The wrist is set for you like a coach sets a beginner's, closing as you rise and opening as you drop, so a novice can rally while a charged swing from the wrong height still goes long, exactly as it would on a real table. The three opponents plan their shots with the same integrator the ball flies by, an order of magnitude apart in reach, reaction and error.",
+  "wallet": "later",
+  "contact": "CONTACT"
+}

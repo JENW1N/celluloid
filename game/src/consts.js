@@ -23,7 +23,7 @@ export const PADDLE = { rx: 0.075, ry: 0.0785, r: 0.077, thick: 0.012, centerY: 
 export const PLAYER = { z0: 1.62, xMax: 1.1, yMin: 0.42, yMax: 2.1, yNeutral: 0.92, reachMin: 0.55, reachMax: 2.0 };
 export const SWING = { chargeTime: 0.55, back: 0.32, forwardT: 0.09, returnT: 0.26, vTap: 2.6, vFull: 10.5 };
 export const TILT = { aimZ: -0.9, yRef: 0.95, closeRate: 1.25, openRate: 1.4, maxClose: 0.75, maxOpen: 0.8 };
-export const SERVE = { handZ: 1.55, handY: 0.16, tossV: 2.35, xMax: 0.9 };
+export const SERVE = { handZ: 1.55, handY: 0.16, tossV: 2.0, xMax: 0.9 };   // a 20 cm toss, legal and slow near the blade
 
 export const PALETTE = {
   tableBlue: 0x2456a8, lineWhite: 0xf2f2ee, ink: 0x141620, courtRed: 0xa8383a, courtRedDark: 0x6f2a2c,
@@ -34,7 +34,7 @@ export const PALETTE = {
 // The three opponents. speed is paddle metres per second, react the delay before it moves,
 // sigma the landing scatter in metres, whiff the chance it swings through nothing.
 export const LEVELS = {
-  rookie: { name: 'ROOKIE', speed: 2.3, react: 0.38, sigma: 0.30, sigmaTheta: 0.055, spd: [5.5, 8.5], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.16, place: 'center', early: 0, serveSpd: [4.8, 6.0], serveSpin: 0, assist: 1.35, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, wrist: 0.65 },
+  rookie: { name: 'ROOKIE', speed: 3.4, react: 0.30, sigma: 0.26, sigmaTheta: 0.05, spd: [5.5, 8.0], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.10, place: 'center', early: 0, serveSpd: [4.8, 6.0], serveSpin: 0, assist: 1.35, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, wrist: 0.65 },
   club: { name: 'CLUB', speed: 4.6, react: 0.20, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.2, assistAngle: 0.16, assistSpin: 260, assistPace: 0.8, wrist: 0.45 },
   pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.05, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, wrist: 0.3 },
 };

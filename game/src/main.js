@@ -155,7 +155,7 @@ function onNewServe() {
   G.ui.gamePoint(m.gamePoint());
   if (m.server === 0) {
     G.serveX = clamp(G.serveX, -SERVE.xMax, SERVE.xMax);
-    G.ui.hint(G.input.touch ? 'TAP TOSS · SECOND FINGER HOLDS AND RELEASES TO SWING' : 'W TO TOSS · ← → TO PLACE · HOLD CLICK, RELEASE TO SWING');
+    G.ui.hint(G.input.touch ? 'HOLD TOSS · LIFT TO SWING AS THE BALL DROPS' : 'W TO TOSS · HOLD CLICK, RELEASE AS THE BALL DROPS · ← → PLACE THE TOSS');
     G.ui.tossVisible(true);
     G.serveMarker.visible = true;
   } else {

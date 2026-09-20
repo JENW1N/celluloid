@@ -123,25 +123,29 @@ while (Date.now() - start < SECONDS * 1000) {
   stats.points = g.points || 0; stats.score = g.score;
   if (g.over) break;
   const [bx, by, bz] = g.ball || [0, 0, 0];
+  const [vx, vy, vz] = g.ballv || [0, 0, 0];
   const px = g.pos[0], py = g.pos[1];
-  // the ball is coming: where will it cross the paddle's plane
+  const CX = VIEW.width * 0.3, CY = VIEW.height * 0.72;      // where the charge finger lands
+  const chargeOn = async () => { if (charging) return; charging = true; if (DESKTOP) await page.mouse.down(); else await fingerDown(1, CX, CY); };
+  const chargeOff = async () => { if (!charging) return; charging = false; if (DESKTOP) await page.mouse.up(); else await fingerUp(1); };
   let want = { x: 0, y: 0.92 };
-  const coming = g.live && g.match === 'IN_PLAY' && g.server !== undefined && bz < 1.62 && g.speed > 0.5;
-  if (coming && g.ballv) {
-    const [vx, vy, vz] = g.ballv;
-    if (vz > 0.3) {
-      // a plain ballistic look-ahead with one table bounce: where the ball meets the paddle plane
-      const plane = g.paddleZ || 1.62;
-      let x = bx, y = by, z = bz, vyy = vy, t = 0;
-      while (t < 1.5 && z < plane) {
-        vyy -= 9.81 / 120; x += vx / 120; y += vyy / 120; z += vz / 120; t += 1 / 120;
-        if (y < 0.78 && vyy < 0 && Math.abs(x) < 0.7625 && Math.abs(z) < 1.37) { y = 0.78; vyy = -vyy * 0.9; }
-      }
-      want = { x, y: Math.max(0.5, Math.min(2.0, y)) };
-      if (!charging && bz > -0.4) { charging = true; if (DESKTOP) await page.mouse.down(); else await fingerDown(1, VIEW.width * 0.85, VIEW.height * 0.85); }
-      if (charging && bz > plane - 0.5) { charging = false; if (DESKTOP) await page.mouse.up(); else await fingerUp(1); }
+  const plane = g.paddleZ || 1.62;
+  if (g.live && g.match === 'IN_PLAY' && bz < plane && vz > 0.3) {
+    // a plain ballistic look-ahead with one table bounce: where the ball meets the paddle plane
+    let x = bx, y = by, z = bz, vyy = vy, t = 0;
+    while (t < 1.5 && z < plane) {
+      vyy -= 9.81 / 120; x += vx / 120; y += vyy / 120; z += vz / 120; t += 1 / 120;
+      if (y < 0.78 && vyy < 0 && Math.abs(x) < 0.7625 && Math.abs(z) < 1.37) { y = 0.78; vyy = -vyy * 0.9; }
     }
-  } else if (charging) { charging = false; if (DESKTOP) await page.mouse.up(); else await fingerUp(1); }
+    want = { x, y: Math.max(0.5, Math.min(2.0, y)) };
+    if (bz > -0.4 && bz < plane - 0.5) await chargeOn();
+    if (bz >= plane - 0.5) await chargeOff();
+  } else if (g.match === 'TOSS' && g.server === 0 && g.live) {
+    // our serve: follow the tossed ball, hold, and let go as it drops onto the blade
+    want = { x: bx, y: Math.max(0.6, by) };
+    if (vy > 0.2) await chargeOn();
+    else if (vy < 0 && by < 0.98) await chargeOff();
+  } else await chargeOff();
   // move the paddle toward want with real input, proportional to the error
   if (DESKTOP) {
     const mx = (want.x / 2.5 + 0.5) * VIEW.width, my = (0.55 - (want.y - 0.92) / 2.2) * VIEW.height;
@@ -154,13 +158,10 @@ while (Date.now() - start < SECONDS * 1000) {
     // a finger that hit the edge re-grabs in the middle, like a trackpad
     if (nx <= 10 || nx >= VIEW.width - 10 || ny <= 90 || ny >= VIEW.height - 40) { await fingerUp(0); finger = { x: pad.x, y: pad.y }; await fingerDown(0, finger.x, finger.y); }
   }
-  // our serve: toss, then a quick charge and release once the ball is falling
+  // toss when it is our serve
   if (g.match === 'SERVE_WAIT' && g.server === 0 && Date.now() - tossedAt > 2500) {
     tossedAt = Date.now();
-    if (DESKTOP) { await page.keyboard.press('KeyW'); } else { await tapWith(2, '#toss'); }
-    await sleep(430);                                      // the toss comes back down to the blade
-    if (DESKTOP) { await page.mouse.down(); await sleep(40); await page.mouse.up(); }
-    else { await fingerDown(1, VIEW.width * 0.85, VIEW.height * 0.85); await sleep(40); await fingerUp(1); }
+    if (DESKTOP) await page.keyboard.press('KeyW'); else await tapWith(2, '#toss');
   }
   if (Date.now() >= nextFrame && frames < 8) {
     await page.screenshot({ path: path.join(OUT, `f${frames}.png`) });

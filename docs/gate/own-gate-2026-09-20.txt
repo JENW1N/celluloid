@@ -1,0 +1,17 @@
+phone:
+ready       2.4 s
+started     yes
+moved       16.91 m
+contacts    9   longest rally 1   points 12 (1-11)
+errors      0   404s 0
+filmstrip   C:\Users\jluke\celluloid\_gate\phone5\strip.png
+RESULT: PASS
+
+laptop:
+ready       2.3 s
+started     yes
+moved       14.65 m
+contacts    11   longest rally 1   points 13 (2-11)
+errors      0   404s 0
+filmstrip   C:\Users\jluke\celluloid\_gate\desktop2\strip.png
+RESULT: PASS

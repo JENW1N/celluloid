@@ -114,7 +114,13 @@ export class Input {
     document.addEventListener('touchend', docEnd, { passive: true });
     document.addEventListener('touchcancel', docEnd, { passive: true });
     const toss = document.getElementById('toss');
-    toss.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.enableTouch(); h.toss(); }, { passive: false });
+    // holding TOSS tosses and draws the swing back in one gesture; lifting the thumb swings
+    toss.addEventListener('touchstart', (e) => {
+      e.preventDefault(); e.stopPropagation(); this.enableTouch();
+      h.toss();
+      const t = e.changedTouches[0];
+      if (t && this.chargeId === null) { this.chargeId = t.identifier; h.chargeStart(); }
+    }, { passive: false });
     toss.addEventListener('click', () => h.toss());
   }
   /** Held keys that repeat: the serve slides while an arrow is down. */
