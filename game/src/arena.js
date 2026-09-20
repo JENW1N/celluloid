@@ -44,6 +44,19 @@ export function instanceAsset(scene, inst, transforms, { outline = 0, colorFor =
   return made;
 }
 
+function makeNetTexture() {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, 128, 64);
+  x.fillStyle = '#ffffff';
+  for (let i = 0; i <= 128; i += 8) x.fillRect(i - 1, 0, 2, 64);
+  for (let j = 0; j <= 64; j += 8) x.fillRect(0, j - 1, 128, 2);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7.5, 1.15);
+  t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function makeDome(scene) {
   const dome = new THREE.Mesh(new THREE.SphereGeometry(48, 24, 12), new THREE.ShaderMaterial({
     uniforms: { top: { value: new THREE.Color(0x05070f) }, mid: { value: new THREE.Color(0x151d38) }, bottom: { value: new THREE.Color(0x261620) } },
@@ -81,13 +94,17 @@ export async function buildArena(scene, { phone = false } = {}) {
 
   const floor = toonify(await ASSET('./assets/court_floor.js'));
   floor.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+  floor.position.y = -0.037;                      // the slab's walking surface is y = 0
   scene.add(floor);
   out.table = toonify(await ASSET('./assets/table.js'), { outline: 0.006 });
   scene.add(out.table);
   out.net = toonify(await ASSET('./assets/net.js', { keepHierarchy: true }), { outline: 0.0025 });
   if (out.net.userData.cloth) {
+    // a net is holes: a grid drawn into a canvas at load time, cut out with alphaTest, so the
+    // ball and the far side show through and the cloth still deforms
     const m = out.net.userData.cloth.material.clone();
-    m.transparent = true; m.opacity = 0.88; m.forceSinglePass = true;
+    m.map = makeNetTexture(); m.alphaTest = 0.5; m.transparent = false; m.side = THREE.DoubleSide;
+    m.color.setHex(0x0f1626); m.needsUpdate = true;
     out.net.userData.cloth.material = m;
     out.net.userData.cloth.castShadow = false;
   }
@@ -118,7 +135,7 @@ export async function buildArena(scene, { phone = false } = {}) {
   const seats = [];
   const seatLocal = new THREE.Matrix4(), tmp = new THREE.Matrix4();
   for (const bm of blocks) for (let r = 0; r < 5; r++) for (let k = 0; k < 8; k++) {
-    if (Math.random() > 0.7) continue;
+    if (Math.random() > 0.55) continue;
     _e.set(0, (Math.random() - 0.5) * 0.35, 0);
     seatLocal.compose(_p.set(-1.75 + 0.5 * k + (Math.random() - 0.5) * 0.06, 0.4 * r, 1.545 - 0.8 * r), _q.setFromEuler(_e), _s);
     seats.push({ m: tmp.multiplyMatrices(bm, seatLocal).clone(), phase: Math.random() * Math.PI * 2, rate: 1.6 + Math.random() * 1.2, jump: Math.random() });
@@ -136,12 +153,12 @@ export async function buildArena(scene, { phone = false } = {}) {
       this.excite += (excitement - this.excite) * (1 - Math.exp(-2 * dt));
       this.cheer = Math.max(0, this.cheer - dt * 0.8);
       if (cheer > this.cheer) this.cheer = cheer;
-      const amp = 0.012 + 0.05 * this.excite;
+      const amp = 0.006 + 0.028 * this.excite;
       const ch = this.cheer;
       for (let i = 0; i < seats.length; i++) {
         const s = seats[i];
         const wave = Math.sin(this.t * (2 + 4 * this.excite) * s.rate + s.phase);
-        const bob = amp * (0.5 + 0.5 * wave) + ch * 0.25 * Math.max(0, Math.sin(this.t * 9 + s.phase)) * (s.jump < 0.6 ? 1 : 0);
+        const bob = amp * (0.5 + 0.5 * wave) + ch * 0.12 * Math.max(0, Math.sin(this.t * 9 + s.phase)) * (s.jump < 0.5 ? 1 : 0);
         for (const part of crowdParts) {
           _m.multiplyMatrices(s.m, part.local);
           _m.elements[13] += bob;

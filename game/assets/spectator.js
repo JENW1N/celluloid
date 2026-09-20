@@ -1,48 +1,21 @@
 /**
- * A seated stylised spectator, 1.05 m high, 0.45 wide, 0.63 deep, no face. Capsule torso and
- * sphere head, cylinder legs bent at the knee with the knees toward +Z and the feet on y = 0,
- * arms down and forward with mitt hands resting on the knees, ink shoes. The seat underside is
- * 0.45 above the feet, one 0.40 bleacher step plus its 0.05 plank, so place it with the feet on
- * the tread below the plank it sits on. Torso, arms and legs share one material so a crowd can
- * be recoloured per figure (crowd A here). Cheap on purpose: it is copied two hundred times.
+ * A seated spectator as a silhouette: a capsule torso leaning back a touch, a lap, shins to the
+ * floor, a head. No arms, no face, few segments. The crowd is two hundred of these and should
+ * read as a crowd, not as people. Feet on y = 0, seat at 0.45 so it sits on a 0.40 step with its
+ * 0.05 plank; the game recolours the body per instance.
  */
 export default function (THREE) {
   const g = new THREE.Group();
-  const mat = (color, name, roughness = 0.7, metalness = 0) =>
-    new THREE.MeshStandardMaterial({ color, roughness, metalness, name });
-  const body = mat(0x3b4a7a, 'fabric', 0.85);
-  const skin = mat(0xe6c9a8, 'plaster', 0.7);
-  const shoe = mat(0x141620, 'fabric', 0.85);
-  const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); g.add(mesh); return mesh; };
-  // a capped cylinder from point a to point b, oriented with a quaternion so no rotation sign
-  // can fling a limb the wrong way
-  const Y = new THREE.Vector3(0, 1, 0);
-  const limb = (r, a, b, m) => {
-    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 12), m);
-    mesh.position.copy(A).add(B).multiplyScalar(0.5);
-    mesh.quaternion.setFromUnitVectors(Y, d.normalize());
-    g.add(mesh); return mesh;
-  };
-
-  const SEAT = 0.45, HIP = SEAT + 0.075, KNEE_Z = 0.36;
-  const torso = add(new THREE.CapsuleGeometry(0.16, 0.10, 2, 12), body, 0, SEAT + 0.21, 0);   // torso, seat to shoulders
-  add(new THREE.SphereGeometry(0.12, 16, 8), skin, 0, 0.93, 0);                   // head, top at 1.05
-  for (const s of [-1, 1]) {
-    const x = s * 0.085;
-    limb(0.075, [x, HIP, -0.06], [x, HIP, KNEE_Z], body);                 // thigh, forward to the knee
-    limb(0.06, [x, HIP, KNEE_Z - 0.03], [x, 0.03, KNEE_Z - 0.03], body);  // shin, down into the shoe
-    add(new THREE.BoxGeometry(0.10, 0.06, 0.22), shoe, x, 0.03, KNEE_Z);   // shoe on the ground
-    const sx = s * 0.14, ex = s * 0.18, hx = s * 0.10;
-    limb(0.045, [sx, 0.78, 0.0], [ex, 0.58, 0.08], body);                 // upper arm, out and down
-    limb(0.04, [ex, 0.58, 0.08], [hx, 0.62, 0.30], body);                 // forearm, forward to the knee
-    add(new THREE.BoxGeometry(0.07, 0.045, 0.09), skin, hx, 0.625, 0.33); // hand resting on the knee
-  }
-
+  const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0, name: 'fabric' });
+  const body = mat(0x2e3a5c), skin = mat(0xd8c0a0);
+  const add = (geo, m, x, y, z, rx = 0) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.rotation.x = rx; g.add(mesh); return mesh; };
+  const seat = 0.45;
+  add(new THREE.CapsuleGeometry(0.15, 0.22, 3, 10), body, 0, seat + 0.26, -0.16, -0.14);   // torso
+  add(new THREE.BoxGeometry(0.32, 0.13, 0.32), body, 0, seat + 0.065, 0.0);                // thighs
+  add(new THREE.BoxGeometry(0.28, seat - 0.02, 0.11), body, 0, (seat - 0.02) / 2, 0.15);    // shins
+  add(new THREE.SphereGeometry(0.1, 12, 8), skin, 0, seat + 0.52 + 0.07, -0.18);            // head
+  g.userData.spectator = { seat: { y: seat, z: -0.155 } };
   recentre(THREE, g);
-  // The seat underside and where it is in the recentred frame, so a level can put the bum on a
-  // plank and the feet on the tread below it.
-  g.userData.seat = { y: SEAT, z: +torso.position.z.toFixed(3), width: 0.45 };
   return g;
 }
 

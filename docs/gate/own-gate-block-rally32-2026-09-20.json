@@ -1,0 +1,134 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-20T22:30:08.670Z",
+  "desktop": true,
+  "level": "rookie",
+  "style": "block",
+  "ready_s": 2.241,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 37.32,
+  "contacts": 29,
+  "longest_rally": 32,
+  "points": 6,
+  "score": [
+    4,
+    2
+  ],
+  "samples": 1279,
+  "log": [
+    "CPU DOUBLE BOUNCE r2 0-1",
+    "YOU DOUBLE BOUNCE r3 1-1",
+    "YOU NET r1 2-1",
+    "YOU DOUBLE BOUNCE r4 3-1",
+    "CPU WINNER r10 3-2",
+    "YOU LONG r32 4-2"
+  ],
+  "hits": [
+    "BLOCK/assisted@5.3",
+    "BLOCK/assisted@5",
+    "BLOCK/assisted@4.2",
+    "S:GOOD/assisted@7",
+    "S:GOOD/assisted@7",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.4",
+    "BLOCK/assisted@4.1",
+    "BLOCK/assisted@4.4",
+    "BLOCK/assisted@4.1",
+    "BLOCK/assisted@4.1",
+    "BLOCK/assisted@4.7",
+    "BLOCK/assisted@4.6",
+    "BLOCK/assisted@4.7",
+    "BLOCK/assisted@4.6",
+    "BLOCK/assisted@4.1",
+    "BLOCK/assisted@4.6",
+    "BLOCK/clean@4.5",
+    "BLOCK/assisted@4.3",
+    "BLOCK/assisted@4.9",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.4",
+    "BLOCK/assisted@4",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.5"
+  ],
+  "final": {
+    "pos": [
+      -0.002459498195143261,
+      0.9206411437117255
+    ],
+    "fps": 240,
+    "speed": 1.1140140398413292,
+    "score": [
+      4,
+      2
+    ],
+    "over": false,
+    "draws": 127,
+    "tris": 127148,
+    "rally": 0,
+    "hits": 29,
+    "state": "PLAY",
+    "ball": [
+      0.18134166972152188,
+      0.7923538162661963,
+      0.00015344266931024864
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        630.3893243720615,
+        578.0460975958416
+      ],
+      "pxPerM": [
+        455.76346362856384,
+        -406.4955247042599
+      ]
+    },
+    "points": 6,
+    "ballv": [
+      -0.19387667009824924,
+      -1.0970040783726809,
+      0.004601063889815509
+    ],
+    "spin": 13.22969538863682,
+    "level": "rookie",
+    "server": 0,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      0,
+      "LONG",
+      32
+    ],
+    "lastHit": {
+      "q": "BLOCK",
+      "a": "assisted",
+      "serve": false,
+      "before": 4.1,
+      "speed": 4.5,
+      "el": 0.425,
+      "spin": 55,
+      "z": 1.58,
+      "y": 1.06,
+      "pad": 0.1
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.582,
+    10.084,
+    17.567,
+    25.087,
+    32.581,
+    40.066,
+    47.589,
+    55.05
+  ],
+  "fails": [],
+  "result": "PASS"
+}

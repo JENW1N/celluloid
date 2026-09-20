@@ -20,6 +20,7 @@
   html,body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--ink); color:var(--paper);
               font-family:"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-user-select:none; user-select:none; }
   canvas#c { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+  body.playing:not(.touch) canvas#c { cursor:none; }
   .pe { pointer-events:auto; }
   .cond { font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
 
@@ -160,8 +161,8 @@
     <button class="btn lv pe" data-level="pro">PRO<small>takes it on the rise</small></button>
   </div>
   <button class="btn big pe" id="startb">PLAY</button>
-  <p id="hint-desktop">mouse moves the paddle · <kbd>hold click</kbd> charges, release swings · flick at contact for spin<br><kbd>W</kbd> tosses your serve · <kbd>←</kbd> <kbd>→</kbd> place the toss · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> opponent · <kbd>M</kbd> mute</p>
-  <p id="hint-touch">one finger drags the paddle · a second finger held charges, lifted swings · flick at contact for spin<br>hold TOSS to toss and charge, lift to swing</p>
+  <p id="hint-desktop">the paddle is your cursor · <kbd>hold click</kbd> charges, release swings · flick at contact for spin<br>your serve: <kbd>hold click</kbd> tosses and charges, release at the top of the toss · <kbd>←</kbd> <kbd>→</kbd> place the toss · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> opponent · <kbd>M</kbd> mute</p>
+  <p id="hint-touch">one finger drags the paddle · a second finger held charges, lifted swings · flick at contact for spin<br>hold TOSS to toss and charge, lift at the top of the toss</p>
   <p><small>first to 11, two clear · CPU serves first</small></p>
 </div>
 

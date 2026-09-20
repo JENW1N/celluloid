@@ -24,16 +24,16 @@ export class PlayerPaddle {
     this.swingT = -1; this.swingPower = 0; this.swingStart = 0; this.swingPeak = 0;
     this.zBase = PLAYER.z0; this.reachZ = null;
     this.yaw = 0; this.pitch = 0; this.flip = 0; this.flipTarget = 0;
-    this.wrist = 0.5;
+    this.wrist = 0.5; this.serving = false;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); }
   nudge(dx, dy) { this.setTarget(this.target.x + dx, this.target.y + dy); }
   startCharge() { if (this.charging || this.swingT >= 0) return false; this.charging = true; this.charge = 0; return true; }
-  release() {
+  release(maxPower = 1) {
     if (!this.charging) return null;
     this.charging = false;
-    this.swingPower = Math.max(0.12, this.charge);
-    this.swingStart = SWING.back * easeOut(this.charge);
+    this.swingPower = Math.min(maxPower, Math.max(0.12, this.charge));
+    this.swingStart = SWING.back * easeOut(this.charge) * (this.serving ? 0.3 : 1);
     this.swingPeak = SWING.vTap + (SWING.vFull - SWING.vTap) * this.swingPower;
     this.swingT = 0; this.charge = 0;
     return this.swingPower;
@@ -52,6 +52,12 @@ export class PlayerPaddle {
     }
     return { s: this.swingStart, v: 0, phase: 0, done: true, forward: false };
   }
+  /** How far the wrist is cocked back, 0..1: the charge while charging, snapping forward after release. */
+  cock() {
+    if (this.charging) return this.charge;
+    if (this.swingT >= 0 && this.swingT < 0.06) return this.swingPower * (1 - this.swingT / 0.06);
+    return 0;
+  }
   /** How well timed a contact right now is. */
   timing() {
     if (this.swingT < 0) return { kind: 'BLOCK', phase: 0 };
@@ -60,7 +66,8 @@ export class PlayerPaddle {
     const kind = sw.phase > 0.85 ? 'PERFECT' : sw.phase > 0.5 ? 'GOOD' : (this.swingT < SWING.forwardT / 2 ? 'EARLY' : 'LATE');
     return { kind, phase: sw.phase };
   }
-  update(dt, ball = null) {
+  update(dt, ball = null, serving = false) {
+    this.serving = serving;
     const k = 1 - Math.exp(-28 * dt);
     this.smooth.lerp(this.target, k);
     const zT = this.reachZ == null ? PLAYER.z0 : clamp(this.reachZ, PLAYER.reachMin, PLAYER.reachMax);
@@ -68,7 +75,7 @@ export class PlayerPaddle {
     let zOff = 0;
     if (this.charging) {
       this.charge = Math.min(1, this.charge + dt / SWING.chargeTime);
-      zOff = SWING.back * easeOut(this.charge);
+      zOff = SWING.back * easeOut(this.charge) * (serving ? 0.3 : 1);
     }
     if (this.swingT >= 0) {
       this.swingT += dt;
@@ -90,7 +97,12 @@ export class PlayerPaddle {
     // the wrist absorbs the incoming angle: when a ball is on its way, lean the face toward the
     // bisector that would send it just over the net, by an amount the level allows. Position
     // still sets the intent (high closes, low opens); this keeps a plain block in play.
-    if (ball && ball.v.z > 0.5 && ball.p.z < this.pos.z && this.pos.z - ball.p.z < 1.6) {
+    if (serving) {
+      // a serve: the blade closes a little so the falling ball is sent down onto your own half
+      // first, whatever height you meet it at; the two-bounce assist does the fine tuning
+      const sp = -0.22, cs = Math.cos(sp);
+      this.normal.set(Math.sin(this.yaw) * cs, Math.sin(sp), -Math.cos(this.yaw) * cs);
+    } else if (ball && ball.v.z > 0.5 && ball.p.z < this.pos.z && this.pos.z - ball.p.z < 1.6) {
       _din.copy(ball.v).normalize();
       const sOut = Math.max(4, RUBBER.e * ball.v.length() + (1 + RUBBER.e) * Math.max(0, -this.vel.z));
       const dNet = Math.max(0.2, this.pos.z);

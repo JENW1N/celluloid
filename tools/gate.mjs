@@ -107,7 +107,7 @@ const pad = { x: VIEW.width * 0.5, y: VIEW.height * 0.62 };
 let finger = { x: pad.x, y: pad.y };
 let charging = false, tossedAt = 0, moved = 0, posPrev = null, frames = 0;
 const frameTimes = [];
-const stats = { contacts: 0, rally: 0, points: 0, score: [0, 0], samples: 0, log: [] };
+const stats = { contacts: 0, rally: 0, points: 0, score: [0, 0], samples: 0, log: [], hits: [] };
 if (!DESKTOP) await fingerDown(0, finger.x, finger.y);
 else await page.mouse.move(pad.x, pad.y);
 const start = Date.now();
@@ -119,6 +119,7 @@ while (Date.now() - start < SECONDS * 1000) {
   stats.samples++;
   if (posPrev) moved += Math.hypot(g.pos[0] - posPrev[0], g.pos[1] - posPrev[1]);
   posPrev = g.pos;
+  if ((g.hits || 0) > stats.contacts && g.lastHit) stats.hits.push(`${g.lastHit.serve ? 'S:' : ''}${g.lastHit.q}/${g.lastHit.a}${g.lastHit.speed ? '@' + g.lastHit.speed : ''}`);
   stats.contacts = Math.max(stats.contacts, g.hits || 0);
   stats.rally = Math.max(stats.rally, g.rally || 0);
   if ((g.points || 0) > stats.points && g.last) stats.log.push(`${g.last[0] === 0 ? 'YOU' : g.last[0] === 1 ? 'CPU' : 'LET'} ${g.last[1] || ''} r${g.last[2] || 0} ${g.score.join('-')}`);
@@ -145,13 +146,18 @@ while (Date.now() - start < SECONDS * 1000) {
   } else if (g.match === 'TOSS' && g.server === 0 && g.live) {
     // our serve: follow the tossed ball, hold, and let go as it drops onto the blade
     want = { x: bx, y: Math.max(0.6, by) };
-    if (vy > 0.2) await chargeOn();
-    else if (vy < 0 && by < 0.98) await chargeOff();
+    if (vy > 0.6) await chargeOn();
+    else if (vy < 0.45) await chargeOff();
   } else await chargeOff();
   // move the paddle toward want with real input, proportional to the error
   if (DESKTOP) {
-    const mx = (want.x / 2.5 + 0.5) * VIEW.width, my = (0.55 - (want.y - 0.92) / 2.2) * VIEW.height;
-    await page.mouse.move(Math.max(2, Math.min(VIEW.width - 2, mx)), Math.max(2, Math.min(VIEW.height - 2, my)));
+    // the blade sits under the cursor: move the mouse by the world error scaled by the screen's
+    // pixels-per-metre at the blade, which the telemetry reports
+    const sc = g.screen;
+    if (sc && sc.pad && sc.pxPerM) {
+      const mx = sc.pad[0] + (want.x - px) * sc.pxPerM[0] * 0.9, my = sc.pad[1] + (want.y - py) * sc.pxPerM[1] * 0.9;
+      await page.mouse.move(Math.max(2, Math.min(VIEW.width - 2, mx)), Math.max(2, Math.min(VIEW.height - 2, my)));
+    }
   } else {
     const dx = (want.x - px) * PX_PER_M_X, dy = -(want.y - py) * PX_PER_M_Y;
     const nx = Math.max(10, Math.min(VIEW.width - 10, finger.x + dx * 0.9));
@@ -195,7 +201,7 @@ if (stats.rally < 1) fails.push('no legal return ever landed');
 if (stats.points < 4) fails.push(`only ${stats.points} point(s) decided, needs 4`);
 if (errors.length) fails.push(`${errors.length} console error(s): ${errors[0]}`);
 if (missing.length) fails.push(`${missing.length} 404(s): ${missing[0]}`);
-const verdict = { url, utc: new Date().toISOString(), desktop: DESKTOP, level: LEVEL, style: STYLE, ready_s: readyS, tapped, startGone, moved_m: +moved.toFixed(2), contacts: stats.contacts, longest_rally: stats.rally, points: stats.points, score: stats.score, samples: stats.samples, log: stats.log, final: last, errors, missing, frames: frameTimes, fails, result: fails.length ? 'FAIL' : 'PASS' };
+const verdict = { url, utc: new Date().toISOString(), desktop: DESKTOP, level: LEVEL, style: STYLE, ready_s: readyS, tapped, startGone, moved_m: +moved.toFixed(2), contacts: stats.contacts, longest_rally: stats.rally, points: stats.points, score: stats.score, samples: stats.samples, log: stats.log, hits: stats.hits, final: last, errors, missing, frames: frameTimes, fails, result: fails.length ? 'FAIL' : 'PASS' };
 fs.writeFileSync(path.join(OUT, 'verdict.json'), JSON.stringify(verdict, null, 2));
 console.log(`=== CELLULOID GATE (${DESKTOP ? 'laptop, mouse and keys' : 'phone, real touch'}) ===`);
 console.log(`url         ${url}`);
@@ -204,6 +210,7 @@ console.log(`started     ${tapped && startGone ? 'yes' : 'no'}`);
 console.log(`moved       ${moved.toFixed(2)} m`);
 console.log(`contacts    ${stats.contacts}   longest rally ${stats.rally}   points ${stats.points} (${stats.score.join('-')})`);
 console.log(`points      ${stats.log.join(' | ') || 'none'}`);
+console.log(`hits        ${stats.hits.join(' | ') || 'none'}`);
 console.log(`errors      ${errors.length}   404s ${missing.length}`);
 console.log(`filmstrip   ${path.join(OUT, 'strip.png')}`);
 console.log(`RESULT: ${verdict.result}${fails.length ? ' (' + fails.join('; ') + ')' : ''}`);

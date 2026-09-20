@@ -1,0 +1,128 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-20T22:29:03.549Z",
+  "desktop": true,
+  "level": "rookie",
+  "style": "charge",
+  "ready_s": 2.198,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 35.39,
+  "contacts": 21,
+  "longest_rally": 9,
+  "points": 13,
+  "score": [
+    3,
+    10
+  ],
+  "samples": 1293,
+  "log": [
+    "YOU DOUBLE BOUNCE r1 1-0",
+    "CPU LONG r9 1-1",
+    "CPU WINNER r3 1-2",
+    "CPU WINNER r1 1-3",
+    "CPU DOUBLE BOUNCE r0 1-4",
+    "CPU LONG r5 1-5",
+    "CPU WINNER r1 1-6",
+    "CPU WINNER r1 1-7",
+    "CPU ACE r0 1-8",
+    "CPU LONG r1 1-9",
+    "YOU LONG r1 2-9",
+    "CPU WINNER r3 2-10",
+    "YOU LONG r2 3-10"
+  ],
+  "hits": [
+    "GOOD/assisted@21.2",
+    "GOOD/assisted@17.9",
+    "GOOD/assisted@16.7",
+    "GOOD/assisted@17.3",
+    "GOOD/assisted@16.5",
+    "GOOD/assisted@16.3",
+    "S:GOOD/assisted@7",
+    "GOOD/assisted@19.9",
+    "S:GOOD/assisted@6.9",
+    "GOOD/assisted@16.8",
+    "GOOD/assisted@17.4",
+    "GOOD/assisted@16.6",
+    "S:PERFECT/clean@6.7",
+    "S:PERFECT/clean@6.7",
+    "GOOD/assisted@17.8",
+    "S:GOOD/assisted@6.9",
+    "EDGE/-@11.6",
+    "S:PERFECT/clean@6.8",
+    "GOOD/assisted@16.2",
+    "GOOD/assisted@19",
+    "EDGE/-@23.1"
+  ],
+  "final": {
+    "pos": [
+      -0.006070215200950839,
+      0.921361285901465
+    ],
+    "fps": 238,
+    "speed": 5.5601219268584074,
+    "score": [
+      3,
+      10
+    ],
+    "over": false,
+    "draws": 120,
+    "tris": 127948,
+    "rally": 0,
+    "hits": 21,
+    "state": "PLAY",
+    "ball": [
+      -1.2142901019581651,
+      6.262598760230154,
+      -4.668622773433258
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        660.0630402851608,
+        578.0456675694799
+      ],
+      "pxPerM": [
+        455.37608078383187,
+        -405.6009724610931
+      ]
+    },
+    "points": 13,
+    "ballv": [
+      -3.037991214803015,
+      0.34961927376429136,
+      -4.643633446313768
+    ],
+    "spin": 470.2830431621837,
+    "level": "rookie",
+    "server": 1,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      0,
+      "LONG",
+      2
+    ],
+    "lastHit": {
+      "q": "EDGE",
+      "a": "-",
+      "serve": false,
+      "speed": 23.1,
+      "rho": 1.15
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.597,
+    10.069,
+    17.563,
+    25.092,
+    32.565,
+    40.121,
+    47.581,
+    55.088
+  ],
+  "fails": [],
+  "result": "PASS"
+}

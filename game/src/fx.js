@@ -81,14 +81,14 @@ export class BallVisual {
     this.shadow.rotation.x = -Math.PI / 2; this.shadow.renderOrder = 1;
     scene.add(this.shadow);
     this.trail = new Trail(scene);
-    this.squash = 0; this.squashV = 0; this.axis = new THREE.Vector3(0, 1, 0);
+    this.squash = 0; this.sqA = 0; this.sqT = 9; this.axis = new THREE.Vector3(0, 1, 0);
     this.spinColor = new THREE.Color(0xffffff);
     this.haloAngle = 0;
   }
   impact(normal, strength) {
     this.axis.copy(normal).normalize();
-    this.squash = Math.max(this.squash, clamp(strength, 0.08, 0.42));
-    this.squashV = 0;
+    this.sqA = Math.max(this.sqA * Math.exp(-this.sqT * 12), clamp(strength, 0.08, 0.4));
+    this.sqT = 0;
   }
   /** Colour by what the spin does to a ball travelling along v. */
   colorFor(w, v) {
@@ -121,10 +121,9 @@ export class BallVisual {
       _b.copy(_a).applyQuaternion(_q);
       this.spinG.rotateOnAxis(_b, Math.min(ws, 28) * dt);
     }
-    // squash spring
-    const k = 900, c = 38;
-    const acc = -k * this.squash - c * this.squashV;
-    this.squashV += acc * dt; this.squash += this.squashV * dt;
+    // squash: a closed-form damped wobble, stable at any frame rate
+    this.sqT += dt;
+    this.squash = this.sqT < 0.5 ? this.sqA * Math.exp(-this.sqT * 12) * Math.cos(this.sqT * 30) : 0;
     const speed = ball.v.length();
     const stretch = clamp(speed / 75, 0, 0.28);
     if (Math.abs(this.squash) > 0.01) {
@@ -147,7 +146,7 @@ export class BallVisual {
     this.halo.scale.setScalar(1 + 0.08 * Math.sin(this.haloAngle * 3));
     // ground shadow
     const overTable = Math.abs(ball.p.x) < 0.7625 && Math.abs(ball.p.z) < 1.37 && ball.p.y > tableY;
-    const gy = overTable ? tableY + 0.002 : 0.04;
+    const gy = overTable ? tableY + 0.002 : 0.003;
     const h = Math.max(0, ball.p.y - gy);
     this.shadow.position.set(ball.p.x, gy, ball.p.z);
     const sc = 1 + h * 1.4;

@@ -114,33 +114,46 @@ export class AudioEngine {
   chargeStart() {
     if (!this.ok()) return;
     this.chargeEnd(0, true);
-    const c = this.ctx, o = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
-    o.type = 'sawtooth'; o.frequency.value = 90; f.type = 'lowpass'; f.frequency.value = 400; f.Q.value = 3; g.gain.value = 0;
-    o.connect(f); f.connect(g); g.connect(this.dry); o.start();
-    g.gain.linearRampToValueAtTime(0.045, this.t + 0.05);
-    this.chargeNodes = { o, f, g }; this.lastChargeTick = 0;
+    // a drawn breath: filtered air that rises as the arm winds back, eight soft ratchet ticks
+    // of a spring taking tension, and a low hum once it is fully wound
+    const c = this.ctx, src = c.createBufferSource(), bp = c.createBiquadFilter(), g = c.createGain();
+    const hum = c.createOscillator(), hg = c.createGain();
+    src.buffer = this.noiseBuf; src.loop = true;
+    bp.type = 'bandpass'; bp.frequency.value = 300; bp.Q.value = 1.6; g.gain.value = 0;
+    hum.type = 'sine'; hum.frequency.value = 62; hg.gain.value = 0;
+    src.connect(bp); bp.connect(g); g.connect(this.dry); hum.connect(hg); hg.connect(this.dry);
+    src.start(0, Math.random()); hum.start();
+    g.gain.linearRampToValueAtTime(0.02, this.t + 0.06);
+    this.chargeNodes = { src, bp, g, hum, hg }; this.lastChargeTick = 0;
   }
   chargeLevel(l) {
     if (!this.chargeNodes) return;
-    const { o, f } = this.chargeNodes;
-    o.frequency.setTargetAtTime(90 + 220 * l, this.t, 0.02);
-    f.frequency.setTargetAtTime(400 + 2200 * l * l, this.t, 0.02);
-    const tick = Math.floor(l * 4 + 1e-6);
-    if (tick > this.lastChargeTick && tick <= 4) {
+    const { bp, g, hum, hg } = this.chargeNodes, t = this.t;
+    bp.frequency.setTargetAtTime(300 + 2600 * l * l, t, 0.03);
+    g.gain.setTargetAtTime(0.02 + 0.07 * l, t, 0.03);
+    hg.gain.setTargetAtTime(l > 0.97 ? 0.05 : 0, t, 0.05);
+    hum.frequency.setTargetAtTime(62 + 5 * Math.sin(t * 22), t, 0.02);
+    const tick = Math.floor(l * 8 + 1e-6);
+    if (tick > this.lastChargeTick && tick <= 8) {
       this.lastChargeTick = tick;
-      this.tone('sine', 1500 + tick * 450, this.t, 0.04, 0.12);
-      if (tick === 4) this.tone('triangle', 3200, this.t, 0.08, 0.1);
+      this.noise(t, 0.012, 0.16, { bp: 1200 + 350 * tick, q: 6 });
+      this.tone('triangle', 520 + 120 * tick, t, 0.03, 0.05);
+      if (tick === 8) this.tone('sine', 1760, t, 0.12, 0.08);
     }
   }
   chargeEnd(power, silent = false) {
     if (!this.ok()) return;
     if (this.chargeNodes) {
-      const { o, g } = this.chargeNodes;
-      g.gain.setTargetAtTime(0, this.t, 0.02); o.stop(this.t + 0.15); this.chargeNodes = null;
+      const { src, g, hum, hg } = this.chargeNodes;
+      g.gain.setTargetAtTime(0, this.t, 0.015); hg.gain.setTargetAtTime(0, this.t, 0.02);
+      src.stop(this.t + 0.12); hum.stop(this.t + 0.15); this.chargeNodes = null;
     }
     if (silent) return;
-    this.tone('square', 420, this.t, 0.02, 0.08 * power, { f1: 200 });
-    this.whoosh(4 + 8 * power);
+    // the crack of the wrist, the blade passing, the body behind it
+    const t = this.t, a = 0.3 + 0.7 * power;
+    this.noise(t, 0.012, 0.5 * a, { bp: 2400, q: 1.2 });
+    this.noise(t + 0.01, 0.2, 0.32 * a, { bp: 2200, q: 0.7, sweep: 350 });
+    this.tone('sine', 110, t, 0.08, 0.25 * a, { f1: 60 });
   }
   point(win, big) {
     if (!this.ok()) return;

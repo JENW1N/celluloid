@@ -32,6 +32,7 @@ const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 120);
 
 const ZERO = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3(), _f = new THREE.Vector3();
+const _ray = new THREE.Raycaster();
 
 const G = {
   ball: new BallState(), paddle: new PlayerPaddle(), match: new Match(), bot: null, level: 'rookie',
@@ -40,6 +41,7 @@ const G = {
   camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
   shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
   lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [],
+  ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [],
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
@@ -82,28 +84,40 @@ function wireButtons() {
   for (const b of document.querySelectorAll('.lv')) b.addEventListener('click', () => { G.level = b.dataset.level; G.ui.setLevel(G.level, LEVELS[G.level].name); G.audio.ui(); });
   G.ui.e.startb.addEventListener('click', () => startGame(G.level));
   G.ui.e.overb.addEventListener('click', () => startGame(G.level));
-  G.ui.e.menub.addEventListener('click', () => { G.running = false; G.ui.hideOver(); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; });
+  G.ui.e.menub.addEventListener('click', () => { G.running = false; document.body.classList.remove('playing'); G.ui.hideOver(); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; });
   G.ui.e.mute.addEventListener('click', () => hooks.mute());
 }
 
 const hooks = {
-  chargeStart() { if (!G.running) return; if (G.paddle.startCharge()) { G.audio.init(); G.audio.chargeStart(); } },
-  release() { if (!G.running) return; const p = G.paddle.release(); if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; } },
+  // where the cursor is, in normalised device coordinates; projected onto the paddle plane each frame
+  pointer(nx, ny) { G.ndc.set(nx, ny); G.hasPointer = true; },
+  chargeStart() {
+    if (!G.running) return;
+    // holding the button when it is your serve tosses and charges in one gesture
+    if (G.match.state === 'SERVE_WAIT' && G.match.server === 0) hooks.toss();
+    if (G.paddle.startCharge()) { G.audio.init(); G.audio.chargeStart(); }
+  },
+  release() {
+    if (!G.running) return;
+    const p = G.paddle.release(G.match.state === 'TOSS' ? SERVE.power : 1);
+    if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; }
+  },
   toss() {
     if (!G.running) return;
     const m = G.match;
     if (m.state !== 'SERVE_WAIT' || m.server !== 0) return;
+    G.serveX = clamp(G.paddle.pos.x + G.serveOffset, -SERVE.xMax, SERVE.xMax);
     const hand = handPos(_a, G.serveX);
     G.ball.set(hand, _b.set(0, SERVE.tossV, 0));
     m.toss(); G.ballLive = true; G.holdingBall = false;
     G.audio.init(); G.audio.toss();
     G.ui.hint(''); G.ui.tossVisible(false); G.serveMarker.visible = false;
   },
-  serveNudge(dx) { G.serveX = clamp(G.serveX + dx, -SERVE.xMax, SERVE.xMax); },
+  serveNudge(dx) { G.serveOffset = clamp(G.serveOffset + dx, -SERVE.offsetMax, SERVE.offsetMax); },
   level(key) { if (!G.running) { G.level = key; G.ui.setLevel(key, LEVELS[key].name); } },
   restart() { if (G.running || G.match.over) startGame(G.level); },
   mute() { G.audio.init(); G.audio.setMuted(!G.audio.muted); G.ui.e.mute.textContent = G.audio.muted ? 'SOUND OFF' : 'SOUND ON'; },
-  menu() { if (!G.running) return; G.running = false; G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; },
+  menu() { if (!G.running) return; G.running = false; document.body.classList.remove('playing'); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; },
   touchMode(on) { G.touch = on; G.ui.setTouch(on); },
 };
 
@@ -114,11 +128,19 @@ function setupPaddleVisuals() {
   for (let i = 0; i < 2; i++) {
     const inst = G.arena.paddles[i];
     const pivot = new THREE.Group();
-    inst.position.set(0, -PADDLE.centerY, 0);
+    const cy = inst.userData.blade ? inst.userData.blade.centerY : PADDLE.centerY;
+    inst.position.set(0, -cy, 0);
     pivot.add(inst);
     scene.add(pivot);
     G.padVis.push(pivot);
   }
+  // two fading ghosts of the blade, shown during the forward swing
+  for (let k = 0; k < 2; k++) {
+    const gm = new THREE.Mesh(new THREE.CircleGeometry(0.076, 28), new THREE.MeshBasicMaterial({ color: 0xd2232a, transparent: true, opacity: 0.32 - k * 0.14, depthWrite: false, side: THREE.DoubleSide }));
+    gm.matrixAutoUpdate = false; gm.visible = false; gm.renderOrder = 3;
+    scene.add(gm); G.ghosts.push(gm);
+  }
+  for (let k = 0; k < 3; k++) G.padHist.push(new THREE.Matrix4());
   G.chargeRing = new THREE.Mesh(new THREE.RingGeometry(0.105, 0.118, 48), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   G.chargeRing.renderOrder = 4;
   G.padVis[0].add(G.chargeRing);
@@ -140,7 +162,8 @@ function startGame(level) {
   G.match.startGame(1);
   G.bot = new Bot(level);
   G.paddle.assist = LEVELS[level].assist; G.paddle.wrist = LEVELS[level].wrist;
-  G.running = true; G.hits = 0; G.overTimer = -1; G.reachZ = null; G.serveX = 0;
+  G.running = true; G.hits = 0; G.overTimer = -1; G.reachZ = null; G.serveX = 0; G.serveOffset = 0;
+  document.body.classList.add('playing');
   G.ui.setScore([0, 0], G.match.server, false);
   G.ui.gamePoint(-1); G.ui.rally(0);
   G.arena.setLevel(0);
@@ -155,7 +178,7 @@ function onNewServe() {
   G.ui.gamePoint(m.gamePoint());
   if (m.server === 0) {
     G.serveX = clamp(G.serveX, -SERVE.xMax, SERVE.xMax);
-    G.ui.hint(G.input.touch ? 'HOLD TOSS · LIFT TO SWING AS THE BALL DROPS' : 'W TO TOSS · HOLD CLICK, RELEASE AS THE BALL DROPS · ← → PLACE THE TOSS');
+    G.ui.hint(G.input.touch ? 'HOLD TOSS · LIFT AT THE TOP OF THE TOSS' : 'HOLD CLICK TO TOSS · RELEASE AT THE TOP OF THE TOSS · ← → PLACE');
     G.ui.tossVisible(true);
     G.serveMarker.visible = true;
   } else {
@@ -181,8 +204,9 @@ function frame(tMs) {
 }
 
 function idle(dt, now) {
+  if (G.hasPointer && !G.input.touch) projectPointer();
   G.paddle.update(dt);
-  updatePaddleVisual(G.padVis[0], G.paddle.pos, G.paddle.normal, G.paddle.flip);
+  updatePaddleVisual(G.padVis[0], G.paddle.pos, G.paddle.normal, 1 - G.paddle.flip);
   if (G.bot) updatePaddleVisual(G.padVis[1], G.bot.visualPos(_a), G.bot.normal, G.bot.flip);
   else updatePaddleVisual(G.padVis[1], _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 0);
   G.ballVis.update(dt, G.ball, now, true, TABLE.H);
@@ -195,20 +219,23 @@ function idle(dt, now) {
 function update(dt, now, realDt) {
   const { ball, paddle, match, bot } = G;
   G.input.update(dt);
-  // the player serves: the ball waits in the hand
+  if (G.hasPointer && !G.input.touch) projectPointer();
+  // the player serves: the ball waits in the hand, beside the paddle
   if (match.state === 'SERVE_WAIT' && match.server === 0) {
+    G.serveX = clamp(paddle.pos.x + G.serveOffset, -SERVE.xMax, SERVE.xMax);
     ball.set(handPos(_a, G.serveX), ZERO);
     G.serveMarker.position.set(G.serveX, TABLE.H + 0.003, TABLE.halfL - 0.04);
   }
   // paddles
   paddle.reachZ = G.reachZ;
   if (paddle.charging) G.audio.chargeLevel(paddle.charge);
-  paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && match.lastHitter === 1 ? ball : null);
+  paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && (match.lastHitter === 1 || match.state === 'TOSS') ? ball : null, match.state === 'TOSS' && match.server === 0);
   bot.update(dt, ball, match, now, paddle.pos.x, G.events);
   if (match.state === 'TOSS' && match.server === 1) G.ballLive = true;
   // physics
   if (G.ballLive) {
     stepWorld(ball, [paddle], dt, G.events, Math.random);
+    if (ball.netHold) G.cloth.press(ball.p.x, ball.p.y, ball.netHold, Math.abs(ball.p.z));
     const out = match.checkOut(ball);
     if (out) handleOutcome(out, now);
     const dead = (ball.p.y - BALL.R < FLOOR_Y + 0.01 && ball.v.length() < 0.5) || Math.abs(ball.p.x) > 7 || Math.abs(ball.p.z) > 8 || ball.p.y < -1;
@@ -222,12 +249,13 @@ function update(dt, now, realDt) {
   G.events.length = 0;
   const tr = match.update(dt);
   if (tr === 'serve') onNewServe();
-  if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
+  if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; document.body.classList.remove('playing'); G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
   // whoosh on a fast swing
   if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
-  // visuals
-  updatePaddleVisual(G.padVis[0], paddle.pos, paddle.normal, paddle.flip);
+  // visuals: the player sees the red side of their own blade; the wrist cocks while charging
+  updatePaddleVisual(G.padVis[0], paddle.pos, paddle.normal, 1 - paddle.flip, paddle.cock(), paddle.charge >= 0.999 && paddle.charging);
   updatePaddleVisual(G.padVis[1], bot.visualPos(_a), bot.normal, bot.flip);
+  updateGhosts(paddle);
   const ch = paddle.charging ? paddle.charge : 0;
   G.chargeRing.material.opacity = ch * 0.85 + (ch >= 0.999 ? 0.15 * Math.sin(G.time * 30) : 0);
   G.chargeRing.scale.setScalar(0.75 + 0.55 * ch);
@@ -276,14 +304,15 @@ function applyAssist(isServe) {
   // a slow ball carries no skill premium: below 7 m/s the lower levels may bend it further, and
   // push it a little harder, so a block met low becomes a lob instead of a pop-up
   const slow = !isServe && speed < 7 && cfg.assistAngle >= 0.15;
-  const maxA = slow ? Math.max(cfg.assistAngle, 0.55) : cfg.assistAngle;
+  const A = isServe ? SERVE.assist : { angle: cfg.assistAngle, pace: cfg.assistPace, spin: cfg.assistSpin };
+  const maxA = slow ? Math.max(A.angle, 0.55) : A.angle;
   // candidates: a little elevation, a little less pace, a touch of the topspin a real stroke
   // would have brushed on, and a nudge of direction. Cheapest change that lands wins.
-  const spinMax = cfg.assistSpin || 0;
+  const spinMax = A.spin || 0;
   const cand = [];
   const ths = [0, 0.015, -0.015, 0.03, -0.03, 0.05, -0.05, 0.08, -0.08, 0.12, -0.12, 0.17, -0.17, 0.23, -0.23, 0.3, -0.3, 0.4, -0.4, 0.55, -0.55].filter((d) => Math.abs(d) <= maxA + 1e-6);
   const spins = [0, 120, 260, 420].filter((w) => w <= spinMax + 1e-6);
-  const sfs = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 1.08].filter((f) => f >= (cfg.assistPace || 0.95) - 1e-6);
+  const sfs = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.5, 1.08].filter((f) => f >= (A.pace || 0.95) - 1e-6);
   if (slow) sfs.push(1.25, 1.45, 1.7);
   for (const dth of ths) for (const dw of spins) for (const sf of sfs) if (dth !== 0 || dw !== 0 || sf !== 1) cand.push({ dth, dph: 0, dw, sf, cost: Math.abs(dth) + dw * 0.0003 + Math.abs(1 - sf) * 0.5 });
   for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.05, -0.05]) cand.push({ dth, dph, dw: 0, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
@@ -308,6 +337,7 @@ function handleEvent(e, now) {
       const res = match.onEvent(e, now);
       const timing = isPlayer ? paddle.timing() : { kind: e.quality || 'GOOD' };
       let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
+      if (isPlayer && e.edge) { G.hitLog.push({ q: 'EDGE', a: '-', serve: !!(res && res.serve !== undefined), speed: +G.ball.v.length().toFixed(1), rho: +e.rho.toFixed(2) }); if (G.hitLog.length > 40) G.hitLog.shift(); }
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
         const before = G.ball.v.length();
         const a = applyAssist(!!(res && res.serve !== undefined));
@@ -393,7 +423,7 @@ function handleOutcome(res, now) {
   }
 }
 
-function updatePaddleVisual(pivot, pos, normal, flip) {
+function updatePaddleVisual(pivot, pos, normal, flip, cock = 0, tremble = false) {
   pivot.position.copy(pos);
   _n.copy(normal).normalize();
   _u.copy(UP).addScaledVector(_n, -_n.y).normalize();
@@ -402,6 +432,36 @@ function updatePaddleVisual(pivot, pos, normal, flip) {
   _b.copy(pos).add(_f);
   pivot.up.set(0, 1, 0);
   pivot.lookAt(_b);
+  if (cock > 0) {
+    // the wrist cocks: the blade tilts back and swings out to the side, then whips through
+    pivot.rotateX(-0.55 * cock);
+    pivot.rotateZ(0.35 * cock);
+    pivot.position.addScaledVector(_c.crossVectors(_u, _n), 0.05 * cock).y += 0.02 * cock;
+  }
+  if (tremble) { pivot.position.x += (Math.random() - 0.5) * 0.006; pivot.position.y += (Math.random() - 0.5) * 0.006; }
+}
+
+/** Where the cursor ray meets the paddle plane is where the blade's centre goes. */
+function projectPointer() {
+  _ray.setFromCamera(G.ndc, camera);
+  const o = _ray.ray.origin, d = _ray.ray.direction;
+  if (Math.abs(d.z) < 1e-4) return;
+  const t = (G.paddle.zBase - o.z) / d.z;
+  if (t <= 0) return;
+  G.paddle.setTarget(o.x + d.x * t, o.y + d.y * t);
+}
+
+/** Two ghosts of the blade trail the forward swing. */
+function updateGhosts(paddle) {
+  const pivot = G.padVis[0];
+  pivot.updateMatrixWorld(true);
+  const forward = paddle.swingT >= 0 && paddle.swingT < 0.14;
+  G.padHist[2].copy(G.padHist[1]); G.padHist[1].copy(G.padHist[0]); G.padHist[0].copy(pivot.matrixWorld);
+  for (let k = 0; k < G.ghosts.length; k++) {
+    const gm = G.ghosts[k];
+    gm.visible = forward && paddle.swingPower > 0.3;
+    if (gm.visible) { gm.matrix.copy(G.padHist[k + 1]); gm.matrixWorldNeedsUpdate = true; }
+  }
 }
 
 // ---------------------------------------------------------------- camera
@@ -409,7 +469,7 @@ function layoutCamera() {
   const a = window.innerWidth / window.innerHeight;
   if (a < 0.85) { G.camBase.set(0, 2.35, 3.45); G.lookBase.set(0, 0.55, -1.0); G.fovBase = 64; }
   else if (a < 1.3) { G.camBase.set(0, 2.15, 3.5); G.lookBase.set(0, 0.6, -0.4); G.fovBase = 56; }
-  else { G.camBase.set(0, 1.85, 3.4); G.lookBase.set(0, 0.7, -0.35); G.fovBase = 48; }
+  else { G.camBase.set(0, 1.95, 3.35); G.lookBase.set(0, 0.62, -0.4); G.fovBase = 48; }
 }
 const _camT = new THREE.Vector3(), _lookT = new THREE.Vector3();
 function updateCamera(dt) {
@@ -417,8 +477,8 @@ function updateCamera(dt) {
   const px = G.running ? p.pos.x : 0;
   const bx = G.ballLive ? clamp(G.ball.p.x, -1, 1) : 0;
   const ch = p.charging ? p.charge : 0;
-  _camT.copy(G.camBase).add(_a.set(px * 0.15 + bx * 0.05, -0.05 * ch, 0.1 * ch));
-  _lookT.copy(G.lookBase).add(_a.set(px * 0.08 + bx * 0.12, 0, 0));
+  _camT.copy(G.camBase).add(_a.set(px * 0.05 + bx * 0.04, -0.04 * ch, 0.08 * ch));
+  _lookT.copy(G.lookBase).add(_a.set(px * 0.03 + bx * 0.1, 0, 0));
   const k = 1 - Math.exp(-6 * dt);
   camera.position.lerp(_camT, k); G.look.lerp(_lookT, k);
   const rallyZoom = clamp((G.match.rally - 4) / 12, 0, 1) * 4;
@@ -442,16 +502,23 @@ function adaptQuality() {
 }
 
 // ---------------------------------------------------------------- telemetry
+const _sp = new THREE.Vector3();
+function screenOf(x, y, z) { _sp.set(x, y, z).project(camera); return [(_sp.x + 1) / 2 * window.innerWidth, (1 - _sp.y) / 2 * window.innerHeight]; }
 function telemetry() {
   if (reachPending) { reachPending = false; if (G.match.state === 'IN_PLAY' && G.match.lastHitter === 1) computeReach(); }
   const g = window.__GAME__, r = renderer.info.render, m = G.match;
   g.pos = [G.paddle.pos.x, G.paddle.pos.y]; g.paddleZ = G.paddle.pos.z;
+  // where the blade is on screen and how many pixels a metre is there, so a driver with a
+  // real mouse can aim it (the game itself never reads this)
+  const p = G.paddle, pad = screenOf(p.pos.x, p.pos.y, p.zBase);
+  g.screen = { pad, pxPerM: [(screenOf(p.pos.x + 0.1, p.pos.y, p.zBase)[0] - pad[0]) / 0.1, (screenOf(p.pos.x, p.pos.y + 0.1, p.zBase)[1] - pad[1]) / 0.1] };
   g.fps = fpsShow; g.speed = G.ballLive ? G.ball.v.length() : 0;
   g.score = m.score; g.over = m.over; g.rally = m.rally; g.hits = G.hits; g.points = m.totalPoints;
   g.draws = r.calls; g.tris = r.triangles;
   g.ball = [G.ball.p.x, G.ball.p.y, G.ball.p.z]; g.ballv = [G.ball.v.x, G.ball.v.y, G.ball.v.z]; g.spin = G.ball.w.length();
   g.level = G.level; g.server = m.server; g.match = m.state; g.live = G.ballLive;
   g.last = m.lastPoint ? (m.lastPoint.let ? ['let'] : [m.lastPoint.winner, m.lastPoint.reason, m.lastPoint.rally]) : null;
+  g.lastHit = G.hitLog.length ? G.hitLog[G.hitLog.length - 1] : null;
   if (G.ui.e.perf.classList.contains('on')) G.ui.perf(`${fpsShow} fps · ${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris`);
 }
 

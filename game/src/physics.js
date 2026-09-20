@@ -25,9 +25,10 @@ export class BallState {
   constructor() {
     this.p = new THREE.Vector3(0, 1, 0); this.pPrev = new THREE.Vector3(0, 1, 0);
     this.v = new THREE.Vector3(); this.w = new THREE.Vector3();
+    this.netHold = 0;                // +1 / -1 while the net has the ball, the direction it went in
   }
-  copy(o) { this.p.copy(o.p); this.pPrev.copy(o.pPrev); this.v.copy(o.v); this.w.copy(o.w); return this; }
-  set(p, v, w) { this.p.copy(p); this.pPrev.copy(p); this.v.copy(v); this.w.copy(w || ZERO); return this; }
+  copy(o) { this.p.copy(o.p); this.pPrev.copy(o.pPrev); this.v.copy(o.v); this.w.copy(o.w); this.netHold = o.netHold; return this; }
+  set(p, v, w) { this.p.copy(p); this.pPrev.copy(p); this.v.copy(v); this.w.copy(w || ZERO); this.netHold = 0; return this; }
   speed() { return this.v.length(); }
 }
 
@@ -46,6 +47,18 @@ export function airStep(b, h) {
     }
   }
   b.w.multiplyScalar(Math.max(0, 1 - AIR.spinDecay * h));
+  // caught in the net: it stretches like a spring, damps hard, rubs the ball down its face, and
+  // lets go on the hitter's side once it has pushed the ball back through the plane
+  if (b.netHold) {
+    const dir = b.netHold, pen = b.p.z * dir;
+    if (pen < 0) { b.netHold = 0; v.z *= 0.6; }
+    else {
+      const capped = Math.min(pen, NET.maxDepth);
+      _a.z += -(NET.k / BALL.M) * capped * dir - (NET.c / BALL.M) * v.z;
+      v.x *= Math.exp(-20 * h); v.y *= Math.exp(-6 * h);
+      if (pen > NET.maxDepth && v.z * dir > 0) v.z = 0;
+    }
+  }
   v.addScaledVector(_a, h);
   b.pPrev.copy(b.p);
   b.p.addScaledVector(v, h);
@@ -109,6 +122,7 @@ function collideTable(b, ev, rnd) {
 
 function collideNet(b, ev, rnd) {
   const z0 = b.pPrev.z, z1 = b.p.z;
+  if (b.netHold) return false;
   if ((z0 > 0) === (z1 > 0) || z0 === z1) return false;
   const t = z0 / (z0 - z1);
   const x = lerp(b.pPrev.x, b.p.x, t), y = lerp(b.pPrev.y, b.p.y, t);
@@ -140,9 +154,11 @@ function collideNet(b, ev, rnd) {
     ev.push({ type: 'netclip', x, y, depth: f, dir, speed });
     return true;
   }
-  b.p.set(x, y, -dir * (R + 0.004)); b.pPrev.copy(b.p);
-  b.v.set(b.v.x * 0.4 + (rnd() - 0.5) * 0.4, Math.min(b.v.y, 0) * 0.25 - 0.4, -dir * speed * 0.10);
+  // into the body of the net: the spring in airStep takes it from here
+  b.p.set(x, y, dir * 0.004); b.pPrev.copy(b.p);
+  b.v.x *= 0.5; b.v.y = Math.min(b.v.y, 0.5); b.v.z *= 0.9;
   b.w.multiplyScalar(0.2);
+  b.netHold = dir;
   ev.push({ type: 'netin', x, y, speed, dir, depth: depth / R });
   return true;
 }
@@ -188,7 +204,7 @@ export function collidePaddle(b, pad, ev, rnd, fa, fb) {
   const rho = _off.length();
   const Reff = pad.radius * (pad.assist || 1);
   if (rho > Reff + BALL.R) return false;
-  const edge = rho > Reff * 0.93;
+  const edge = rho > Reff;
   _nb.copy(n).multiplyScalar(side);
   if (edge) { _nb.x += (rnd() - 0.5) * 0.9; _nb.y += (rnd() - 0.5) * 0.9; _nb.z += (rnd() - 0.5) * 0.4; _nb.normalize(); }
   _tmp.copy(b.v).sub(pad.vel);

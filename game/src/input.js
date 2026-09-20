@@ -39,9 +39,9 @@ export class Input {
     this.hooks.touchMode && this.hooks.touchMode(true);
   }
   applyMouse() {
-    const x = (this.mouse.x - 0.5) * 2 * 1.25;
-    const y = PLAYER.yNeutral + (0.55 - this.mouse.y) * 2.2;
-    this.paddle.setTarget(x, y);
+    // normalised device coordinates; the game projects them onto the paddle's plane so the
+    // blade's centre sits under the cursor
+    this.hooks.pointer((this.mouse.x - 0.5) * 2, (0.5 - this.mouse.y) * 2);
   }
   bind() {
     const h = this.hooks;

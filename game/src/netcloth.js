@@ -25,7 +25,15 @@ export class NetCloth {
     this.tapeBase = this.tape ? this.tape.position.z : 0;
     this.tz = 0; this.tv = 0; this.ty = 0; this.tvy = 0;
     this.active = 0;
+    this.pressing = null;
     this._v = new THREE.Vector3();
+  }
+  /** The ball is inside the net at this world point: the cloth wraps around it. */
+  press(x, y, dir, depth) {
+    if (!this.cloth) return;
+    const lp = this._v.set(x, y, 0).applyMatrix4(this.worldToLocal);
+    this.pressing = { x: lp.x, y: lp.y, dir, depth };
+    this.active = 3;
   }
   /** An impulse at a world point: dir is +1/-1 along z, strength in metres of displacement. */
   impulse(x, y, dir, strength, radius = 0.14) {
@@ -50,12 +58,23 @@ export class NetCloth {
     let energy = 0;
     for (let iy = 1; iy < rows; iy++) for (let ix = 1; ix < cols - 1; ix++) {
       const i = (iy * cols + ix) * 3 + 2;
-      const z = pos[i], vz = (z - prev[i]) * 0.94;
+      const z = pos[i], vz = (z - prev[i]) * 0.965;
       const nb = (pos[i - 3] + pos[i + 3] + pos[i - cols * 3] + (iy < rows - 1 ? pos[i + cols * 3] : z)) * 0.25;
-      const acc = 380 * (base[i] - z) + 1400 * (nb - z);
+      const acc = 260 * (base[i] - z) + 1600 * (nb - z);
       prev[i] = z;
       pos[i] = z + vz + acc * h * h;
       energy += Math.abs(vz) + Math.abs(pos[i] - base[i]);
+    }
+    if (this.pressing) {
+      const { x, y, dir, depth } = this.pressing, r = 0.11;
+      for (let i = 0; i < this.n; i++) {
+        const dx = base[i * 3] - x, dy = base[i * 3 + 1] - y, d = Math.hypot(dx, dy);
+        if (d > r) continue;
+        const want = dir * (depth + 0.02) * (1 - (d / r) * (d / r));
+        if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.002; }
+      }
+      this.tv += dir * depth * 3 * h * 30;
+      this.pressing = null;
     }
     const attr = this.cloth.geometry.attributes.position;
     attr.array.set(pos); attr.needsUpdate = true;
