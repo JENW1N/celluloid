@@ -105,7 +105,7 @@ const startGone = await page.evaluate(() => { const e = document.querySelector('
 const PX_PER_M_X = 160, PX_PER_M_Y = 250;       // the game's finger sensitivities
 const pad = { x: VIEW.width * 0.5, y: VIEW.height * 0.62 };
 let finger = { x: pad.x, y: pad.y };
-let charging = false, tossedAt = 0, moved = 0, posPrev = null, frames = 0;
+let charging = false, chargeFinger = 1, tossedAt = 0, moved = 0, posPrev = null, frames = 0;
 const frameTimes = [];
 const stats = { contacts: 0, rally: 0, points: 0, score: [0, 0], samples: 0, log: [], hits: [] };
 if (!DESKTOP) await fingerDown(0, finger.x, finger.y);
@@ -129,8 +129,8 @@ while (Date.now() - start < SECONDS * 1000) {
   const [vx, vy, vz] = g.ballv || [0, 0, 0];
   const px = g.pos[0], py = g.pos[1];
   const CX = VIEW.width * 0.3, CY = VIEW.height * 0.72;      // where the charge finger lands
-  const chargeOn = async () => { if (charging) return; charging = true; if (DESKTOP) await page.mouse.down(); else await fingerDown(1, CX, CY); };
-  const chargeOff = async () => { if (!charging) return; charging = false; if (DESKTOP) await page.mouse.up(); else await fingerUp(1); };
+  const chargeOn = async () => { if (charging) return; charging = true; chargeFinger = 1; if (DESKTOP) await page.mouse.down(); else await fingerDown(1, CX, CY); };
+  const chargeOff = async () => { if (!charging) return; charging = false; if (DESKTOP) await page.mouse.up(); else await fingerUp(chargeFinger); };
   let want = { x: 0, y: 0.92 };
   const plane = g.paddleZ || 1.62;
   if (g.live && g.match === 'IN_PLAY' && bz < plane && vz > 0.3) {
@@ -146,8 +146,8 @@ while (Date.now() - start < SECONDS * 1000) {
   } else if (g.match === 'TOSS' && g.server === 0 && g.live) {
     // our serve: follow the tossed ball, hold, and let go as it drops onto the blade
     want = { x: bx, y: Math.max(0.6, by) };
-    if (vy > 0.6) await chargeOn();
-    else if (vy < 0.45) await chargeOff();
+    if (DESKTOP && vy > 0.6) await chargeOn();            // on a phone the thumb is already holding TOSS
+    if (vy < 0.45) await chargeOff();
   } else await chargeOff();
   // move the paddle toward want with real input, proportional to the error
   if (DESKTOP) {
@@ -169,7 +169,12 @@ while (Date.now() - start < SECONDS * 1000) {
   // toss when it is our serve
   if (g.match === 'SERVE_WAIT' && g.server === 0 && Date.now() - tossedAt > 2500) {
     tossedAt = Date.now();
-    if (DESKTOP) await page.keyboard.press('KeyW'); else await tapWith(2, '#toss');
+    if (DESKTOP) await page.keyboard.press('KeyW');
+    else {
+      // hold TOSS: the game tosses and charges; the thumb lifts at the top of the toss
+      const box = await page.$eval('#toss', (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width }; }).catch(() => null);
+      if (box && box.w > 4) { await fingerDown(2, box.x, box.y); charging = true; chargeFinger = 2; }
+    }
   }
   if (Date.now() >= nextFrame && frames < 8) {
     await page.screenshot({ path: path.join(OUT, `f${frames}.png`) });

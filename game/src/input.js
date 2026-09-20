@@ -23,7 +23,7 @@ export class Input {
   constructor(canvas, paddle, hooks) {
     this.canvas = canvas; this.paddle = paddle; this.hooks = hooks;
     this.keys = new Set();
-    this.touch = false; this.primary = null; this.chargeId = null;
+    this.touch = false; this.primary = null; this.chargeId = null; this.tossAt = -1;
     this.last = { x: 0, y: 0 };
     this.mouse = { x: 0.5, y: 0.55 };
     this.SX = 160; this.SY = 250;          // finger pixels per metre, x and y
@@ -89,10 +89,16 @@ export class Input {
       }
       e.preventDefault();
     };
+    const lift = () => {
+      // lifted within a blink of the toss: it was a tap, not a hold. Toss only, no swing.
+      this.chargeId = null;
+      if (this.tossAt >= 0 && performance.now() - this.tossAt < 180) { this.tossAt = -1; h.cancelCharge(); }
+      else { this.tossAt = -1; h.release(); }
+    };
     const end = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === this.primary) this.primary = null;
-        else if (t.identifier === this.chargeId) { this.chargeId = null; h.release(); }
+        else if (t.identifier === this.chargeId) lift();
       }
       if (e.cancelable) e.preventDefault();
     };
@@ -109,7 +115,7 @@ export class Input {
       this.chargeId = t.identifier; h.chargeStart();
     }, { passive: true });
     const docEnd = (e) => {
-      for (const t of e.changedTouches) if (t.identifier === this.chargeId) { this.chargeId = null; h.release(); }
+      for (const t of e.changedTouches) if (t.identifier === this.chargeId) lift();
     };
     document.addEventListener('touchend', docEnd, { passive: true });
     document.addEventListener('touchcancel', docEnd, { passive: true });
@@ -119,7 +125,7 @@ export class Input {
       e.preventDefault(); e.stopPropagation(); this.enableTouch();
       h.toss();
       const t = e.changedTouches[0];
-      if (t && this.chargeId === null) { this.chargeId = t.identifier; h.chargeStart(); }
+      if (t && this.chargeId === null) { this.chargeId = t.identifier; this.tossAt = performance.now(); h.chargeStart(); }
     }, { passive: false });
     toss.addEventListener('click', () => h.toss());
   }

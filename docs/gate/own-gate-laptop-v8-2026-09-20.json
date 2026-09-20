@@ -1,0 +1,132 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-20T22:35:58.532Z",
+  "desktop": true,
+  "level": "rookie",
+  "style": "charge",
+  "ready_s": 2.525,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 33.1,
+  "contacts": 20,
+  "longest_rally": 6,
+  "points": 13,
+  "score": [
+    6,
+    7
+  ],
+  "samples": 1306,
+  "log": [
+    "CPU ACE r0 0-1",
+    "CPU LONG r1 0-2",
+    "YOU WINNER r2 1-2",
+    "CPU WINNER r5 1-3",
+    "YOU WINNER r1 2-3",
+    "YOU WINNER r1 3-3",
+    "YOU OUT r1 4-3",
+    "YOU WINNER r2 5-3",
+    "CPU LONG r1 5-4",
+    "CPU LONG r1 5-5",
+    "CPU WINNER r3 5-6",
+    "YOU WINNER r6 6-6",
+    "CPU WINNER r2 6-7"
+  ],
+  "hits": [
+    "EDGE/-@20.9",
+    "S:GOOD/assisted@6.3",
+    "GOOD/assisted@15.9",
+    "S:GOOD/assisted@6.4",
+    "GOOD/assisted@19",
+    "GOOD/assisted@16.3",
+    "GOOD/assisted@17.5",
+    "GOOD/assisted@15.4",
+    "S:GOOD/assisted@6.3",
+    "S:GOOD/assisted@6.3",
+    "GOOD/assisted@16.7",
+    "EDGE/-@11.2",
+    "EDGE/-@20.9",
+    "S:GOOD/assisted@6.2",
+    "GOOD/assisted@18.1",
+    "S:GOOD/assisted@6.3",
+    "GOOD/assisted@16.6",
+    "GOOD/assisted@16.7",
+    "GOOD/assisted@15",
+    "GOOD/assisted@16.3"
+  ],
+  "final": {
+    "pos": [
+      -0.0015327688069794823,
+      0.9210502496859181
+    ],
+    "fps": 240,
+    "speed": 2.8176178340999236,
+    "score": [
+      6,
+      7
+    ],
+    "over": false,
+    "draws": 119,
+    "tris": 132104,
+    "rally": 0,
+    "hits": 20,
+    "state": "PLAY",
+    "ball": [
+      -0.18763974976312617,
+      0.06132164705763114,
+      3.0522157570681614
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        644.1865951117575,
+        577.816650277292
+      ],
+      "pxPerM": [
+        454.94407832457455,
+        -405.54272773954835
+      ]
+    },
+    "points": 13,
+    "ballv": [
+      -0.1612355569495658,
+      -2.069529422175741,
+      1.9052614846687188
+    ],
+    "spin": 103.77885442858916,
+    "level": "rookie",
+    "server": 1,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      1,
+      "WINNER",
+      2
+    ],
+    "lastHit": {
+      "q": "GOOD",
+      "a": "assisted",
+      "serve": false,
+      "before": 16.3,
+      "speed": 16.3,
+      "el": 0.125,
+      "spin": -213,
+      "z": 1.57,
+      "y": 0.91,
+      "pad": 7.2
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.579,
+    10.073,
+    17.567,
+    25.094,
+    32.551,
+    40.078,
+    47.63,
+    55.069
+  ],
+  "fails": [],
+  "result": "PASS"
+}

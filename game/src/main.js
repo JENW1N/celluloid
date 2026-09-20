@@ -97,6 +97,11 @@ const hooks = {
     if (G.match.state === 'SERVE_WAIT' && G.match.server === 0) hooks.toss();
     if (G.paddle.startCharge()) { G.audio.init(); G.audio.chargeStart(); }
   },
+  cancelCharge() {
+    if (!G.running || !G.paddle.charging) return;
+    G.paddle.charging = false; G.paddle.charge = 0;
+    G.audio.chargeEnd(0, true);
+  },
   release() {
     if (!G.running) return;
     const p = G.paddle.release(G.match.state === 'TOSS' ? SERVE.power : 1);
@@ -290,12 +295,15 @@ function computeReach() {
 function applyAssist(isServe) {
   const cfg = LEVELS[G.level];
   const b = G.ball;
+  // legal with a margin: the same step the live integrator uses, a clear net, and a landing
+  // well inside the lines, so what the assist promises is what the table delivers
+  const inside = (e) => e.z < -0.12 && e.z > -TABLE.halfL + 0.14 && Math.abs(e.x) < TABLE.halfW - 0.06 && !e.edge;
   const legal = (state) => {
-    const r = predict(state, { maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
-    if (r.events.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip')) return false;
+    const r = predict(state, { h: 1 / 600, maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
+    if (r.events.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip' || (x.type === 'nearmiss' && x.clearance < 0.012))) return false;
     const tables = r.events.filter((x) => x.type === 'table');
-    if (isServe) return tables.length >= 2 && tables[0].side === 0 && tables[1].side === 1;
-    return tables.length >= 1 && tables[0].side === 1;
+    if (isServe) return tables.length >= 2 && tables[0].side === 0 && tables[0].z > 0.25 && tables[0].z < TABLE.halfL - 0.1 && tables[1].side === 1 && inside(tables[1]);
+    return tables.length >= 1 && tables[0].side === 1 && inside(tables[0]);
   };
   if (legal(b)) return 'clean';
   const speed = b.v.length();
