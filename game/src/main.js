@@ -39,7 +39,7 @@ const G = {
   serveX: 0, events: [], time: 0, running: false, ballLive: false, reachZ: null, touch: false,
   camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
   shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
-  lastPointT: -10, holdingBall: false, whooshT: 0,
+  lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [],
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
@@ -139,7 +139,7 @@ function startGame(level) {
   G.ui.setLevel(level, LEVELS[level].name);
   G.match.startGame(1);
   G.bot = new Bot(level);
-  G.paddle.assist = LEVELS[level].assist;
+  G.paddle.assist = LEVELS[level].assist; G.paddle.wrist = LEVELS[level].wrist;
   G.running = true; G.hits = 0; G.overTimer = -1; G.reachZ = null; G.serveX = 0;
   G.ui.setScore([0, 0], G.match.server, false);
   G.ui.gamePoint(-1); G.ui.rally(0);
@@ -203,7 +203,7 @@ function update(dt, now, realDt) {
   // paddles
   paddle.reachZ = G.reachZ;
   if (paddle.charging) G.audio.chargeLevel(paddle.charge);
-  paddle.update(realDt > 0.05 ? realDt : dt);
+  paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && match.lastHitter === 1 ? ball : null);
   bot.update(dt, ball, match, now, paddle.pos.x, G.events);
   if (match.state === 'TOSS' && match.server === 1) G.ballLive = true;
   // physics
@@ -274,16 +274,24 @@ function applyAssist(isServe) {
   if (speed < 0.8) return 'none';
   const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl), ph0 = Math.atan2(b.v.x, b.v.z);
   const maxA = cfg.assistAngle;
+  // candidates: a little elevation, a little less pace, a touch of the topspin a real stroke
+  // would have brushed on, and a nudge of direction. Cheapest change that lands wins.
+  const spinMax = cfg.assistSpin || 0;
   const cand = [];
-  for (const dth of [0.03, -0.03, 0.06, -0.06, 0.1, -0.1, 0.15, -0.15, 0.22, -0.22, 0.3, -0.3]) if (Math.abs(dth) <= maxA + 1e-6) for (const sf of [1, 0.93, 1.07, 0.85]) cand.push({ dth, dph: 0, sf, cost: Math.abs(dth) + Math.abs(1 - sf) * 0.6 });
-  for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.06, -0.06]) cand.push({ dth, dph, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
+  const ths = [0, 0.015, -0.015, 0.03, -0.03, 0.05, -0.05, 0.08, -0.08, 0.12, -0.12, 0.17, -0.17, 0.23, -0.23, 0.3, -0.3].filter((d) => Math.abs(d) <= maxA + 1e-6);
+  const spins = [0, 120, 260, 420].filter((w) => w <= spinMax + 1e-6);
+  const sfs = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 1.08].filter((f) => f >= (cfg.assistPace || 0.95) - 1e-6);
+  for (const dth of ths) for (const dw of spins) for (const sf of sfs) if (dth !== 0 || dw !== 0 || sf !== 1) cand.push({ dth, dph: 0, dw, sf, cost: Math.abs(dth) + dw * 0.0003 + Math.abs(1 - sf) * 0.5 });
+  for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.05, -0.05]) cand.push({ dth, dph, dw: 0, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
   cand.sort((x, y) => x.cost - y.cost);
   const trial = new BallState();
+  const topspinSign = b.v.z < 0 ? -1 : 1;     // topspin for a ball travelling -z is negative x
   for (const c of cand) {
     const th = th0 + c.dth, ph = ph0 + c.dph, s = speed * c.sf;
     trial.copy(b);
     trial.v.set(s * Math.cos(th) * Math.sin(ph), s * Math.sin(th), s * Math.cos(th) * Math.cos(ph));
-    if (legal(trial)) { b.v.copy(trial.v); return 'assisted'; }
+    trial.w.x += topspinSign * c.dw;
+    if (legal(trial)) { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; }
   }
   return 'none';
 }
@@ -297,9 +305,13 @@ function handleEvent(e, now) {
       const timing = isPlayer ? paddle.timing() : { kind: e.quality || 'GOOD' };
       let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
-        const a = applyAssist(!!(res && res.serve));
+        const before = G.ball.v.length();
+        const a = applyAssist(!!(res && res.serve !== undefined));
         if (a === 'assisted' && q === 'PERFECT') q = 'GOOD';
         computeReachLater();
+        const v = G.ball.v;
+        G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1) });
+        if (G.hitLog.length > 40) G.hitLog.shift();
       }
       audio.paddle(e.speedIn + e.padSpeed * 0.5, { quality: q, edge: e.edge, slip: e.slip, brush: e.brush });
       fx.impact(e.point, e.normal, q, e.speedOut);
@@ -391,7 +403,7 @@ function updatePaddleVisual(pivot, pos, normal, flip) {
 // ---------------------------------------------------------------- camera
 function layoutCamera() {
   const a = window.innerWidth / window.innerHeight;
-  if (a < 0.85) { G.camBase.set(0, 2.6, 3.6); G.lookBase.set(0, 0.5, -0.6); G.fovBase = 68; }
+  if (a < 0.85) { G.camBase.set(0, 2.35, 3.45); G.lookBase.set(0, 0.55, -1.0); G.fovBase = 64; }
   else if (a < 1.3) { G.camBase.set(0, 2.15, 3.5); G.lookBase.set(0, 0.6, -0.4); G.fovBase = 56; }
   else { G.camBase.set(0, 1.85, 3.4); G.lookBase.set(0, 0.7, -0.35); G.fovBase = 48; }
 }
@@ -429,13 +441,17 @@ function adaptQuality() {
 function telemetry() {
   if (reachPending) { reachPending = false; if (G.match.state === 'IN_PLAY' && G.match.lastHitter === 1) computeReach(); }
   const g = window.__GAME__, r = renderer.info.render, m = G.match;
-  g.pos = [G.paddle.pos.x, G.paddle.pos.y];
+  g.pos = [G.paddle.pos.x, G.paddle.pos.y]; g.paddleZ = G.paddle.pos.z;
   g.fps = fpsShow; g.speed = G.ballLive ? G.ball.v.length() : 0;
   g.score = m.score; g.over = m.over; g.rally = m.rally; g.hits = G.hits; g.points = m.totalPoints;
   g.draws = r.calls; g.tris = r.triangles;
-  g.ball = [G.ball.p.x, G.ball.p.y, G.ball.p.z]; g.spin = G.ball.w.length();
+  g.ball = [G.ball.p.x, G.ball.p.y, G.ball.p.z]; g.ballv = [G.ball.v.x, G.ball.v.y, G.ball.v.z]; g.spin = G.ball.w.length();
   g.level = G.level; g.server = m.server; g.match = m.state; g.live = G.ballLive;
   if (G.ui.e.perf.classList.contains('on')) G.ui.perf(`${fpsShow} fps · ${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris`);
 }
 
 boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
+
+// Debug handles for the console and the gate. Nothing in the game reads these.
+import { solveShot } from './bots.js';
+window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER };

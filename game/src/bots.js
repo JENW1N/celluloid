@@ -217,7 +217,7 @@ export class Bot {
     const tx = rr(-0.45, 0.45), tz2 = rr(0.5, 1.15);
     const base = rr(cfg.serveSpd[0], cfg.serveSpd[1]);
     let best = null;
-    for (const z1 of [-1.0, -0.85, -0.7, -0.55]) for (const f of [0.7, 0.85, 1.0, 1.15, 1.3]) {
+    for (const z1 of [-1.05, -0.92, -0.8, -0.68, -0.55, -0.42]) for (const f of [0.6, 0.72, 0.85, 1.0, 1.15, 1.32, 1.5]) {
       const spd = base * f;
       _d.set(tx * 0.5 - P.x, TABLE.H + BALL.R - P.y, z1 - P.z).normalize();
       _b.set(P, _v.copy(_d).multiplyScalar(spd), w);

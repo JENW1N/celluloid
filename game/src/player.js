@@ -7,7 +7,9 @@
  * so a fast flick at contact is a brush, and a brush is spin.
  */
 import * as THREE from 'three';
-import { PADDLE, PLAYER, SWING, TILT, clamp, easeOut, easeInOut } from './consts.js';
+import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js';
+
+const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3();
 
 export class PlayerPaddle {
   constructor() {
@@ -22,6 +24,7 @@ export class PlayerPaddle {
     this.swingT = -1; this.swingPower = 0; this.swingStart = 0; this.swingPeak = 0;
     this.zBase = PLAYER.z0; this.reachZ = null;
     this.yaw = 0; this.pitch = 0; this.flip = 0; this.flipTarget = 0;
+    this.wrist = 0.5;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); }
   nudge(dx, dy) { this.setTarget(this.target.x + dx, this.target.y + dy); }
@@ -57,7 +60,7 @@ export class PlayerPaddle {
     const kind = sw.phase > 0.85 ? 'PERFECT' : sw.phase > 0.5 ? 'GOOD' : (this.swingT < SWING.forwardT / 2 ? 'EARLY' : 'LATE');
     return { kind, phase: sw.phase };
   }
-  update(dt) {
+  update(dt, ball = null) {
     const k = 1 - Math.exp(-28 * dt);
     this.smooth.lerp(this.target, k);
     const zT = this.reachZ == null ? PLAYER.z0 : clamp(this.reachZ, PLAYER.reachMin, PLAYER.reachMax);
@@ -84,6 +87,20 @@ export class PlayerPaddle {
     this.pitch += (pitchT - this.pitch) * kr;
     const cp = Math.cos(this.pitch);
     this.normal.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+    // the wrist absorbs the incoming angle: when a ball is on its way, lean the face toward the
+    // bisector that would send it just over the net, by an amount the level allows. Position
+    // still sets the intent (high closes, low opens); this keeps a plain block in play.
+    if (ball && ball.v.z > 0.5 && ball.p.z < this.pos.z && this.pos.z - ball.p.z < 1.6) {
+      _din.copy(ball.v).normalize();
+      const sOut = Math.max(4, RUBBER.e * ball.v.length() + (1 + RUBBER.e) * Math.max(0, -this.vel.z));
+      const dNet = Math.max(0.2, this.pos.z);
+      const drop = 0.5 * 9.81 * (dNet / sOut) * (dNet / sOut);
+      _tgt.set(this.pos.x * 0.35, TABLE.H + NET.H + 0.07 + drop, 0);
+      _dout.copy(_tgt).sub(this.pos).normalize();
+      _nb.copy(_dout).sub(_din).normalize();
+      if (_nb.z > 0) _nb.negate();
+      this.normal.lerp(_nb, this.wrist).normalize();
+    }
     if (this.pos.x < -0.14) this.flipTarget = 1; else if (this.pos.x > 0.14) this.flipTarget = 0;
     this.flip += (this.flipTarget - this.flip) * (1 - Math.exp(-14 * dt));
   }

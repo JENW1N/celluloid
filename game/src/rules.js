@@ -15,7 +15,7 @@ export class Match {
     this.state = 'IDLE';
     this.rally = 0; this.hits = 0; this.longestRally = 0; this.totalPoints = 0;
     this.lastHitter = -1; this.bounces = [0, 0];
-    this.serving = false; this.serveBounced = false; this.letPending = false;
+    this.serving = false; this.serveBounced = false; this.letPending = false; this.unreturned = false;
     this.pointTimer = 0; this.lastPoint = null; this.winner = -1;
     this.lastContactT = [-1, -1];
     this.stats = { winners: [0, 0], errors: [0, 0], aces: [0, 0] };
@@ -41,7 +41,7 @@ export class Match {
   onEvent(e, now = 0) {
     if (this.state === 'TOSS') {
       if (e.type === 'paddle' && e.owner === this.server) {
-        this.state = 'IN_PLAY'; this.serving = true; this.serveBounced = false; this.letPending = false;
+        this.state = 'IN_PLAY'; this.serving = true; this.serveBounced = false; this.letPending = false; this.unreturned = true;
         this.lastHitter = e.owner; this.bounces = [0, 0]; this.lastContactT[e.owner] = now;
         return { serve: e.owner };
       }
@@ -57,7 +57,7 @@ export class Match {
           return this.award(other, 'DOUBLE HIT');
         }
         if (this.bounces[e.owner] === 1) {
-          this.lastHitter = e.owner; this.bounces = [0, 0]; this.serving = false; this.letPending = false;
+          this.lastHitter = e.owner; this.bounces = [0, 0]; this.serving = false; this.letPending = false; this.unreturned = false;
           this.rally++; this.hits++; this.longestRally = Math.max(this.longestRally, this.rally);
           this.lastContactT[e.owner] = now;
           return { legal: e.owner, rally: this.rally };
@@ -86,7 +86,7 @@ export class Match {
       case 'netin': return this.award(other, 'NET');
       case 'netclip': if (this.serving) this.letPending = true; return null;
       case 'floor': case 'gone': {
-        if (this.bounces[other] === 1) return this.award(me, this.serving ? 'ACE' : 'WINNER');
+        if (this.bounces[other] === 1) return this.award(me, this.unreturned ? 'ACE' : 'WINNER');
         if (this.serving && !this.serveBounced) return this.award(other, 'SERVE FAULT');
         return this.award(other, 'OUT');
       }

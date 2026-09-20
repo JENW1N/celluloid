@@ -11,6 +11,14 @@
  */
 import { PLAYER } from './consts.js';
 
+/** Some drivers send key without code; take either. */
+const KEYS = { w: 'KeyW', r: 'KeyR', m: 'KeyM', ' ': 'Space', 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', escape: 'Escape' };
+function keyCode(e) {
+  if (e.code) return e.code;
+  const k = String(e.key || '');
+  return KEYS[k.length === 1 ? k.toLowerCase() : k.toLowerCase()] || k;
+}
+
 export class Input {
   constructor(canvas, paddle, hooks) {
     this.canvas = canvas; this.paddle = paddle; this.hooks = hooks;
@@ -47,8 +55,9 @@ export class Input {
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
-      this.keys.add(e.code);
-      switch (e.code) {
+      const code = keyCode(e);
+      this.keys.add(code);
+      switch (code) {
         case 'KeyW': h.toss(); break;
         case 'Space': e.preventDefault(); h.chargeStart(); break;
         case 'Digit1': h.level('rookie'); break;
@@ -60,7 +69,7 @@ export class Input {
         default: break;
       }
     });
-    window.addEventListener('keyup', (e) => { this.keys.delete(e.code); if (e.code === 'Space') h.release(); });
+    window.addEventListener('keyup', (e) => { const code = keyCode(e); this.keys.delete(code); if (code === 'Space') h.release(); });
 
     const pad = document.getElementById('stick');
     const start = (e) => {
