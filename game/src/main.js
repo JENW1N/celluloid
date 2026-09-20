@@ -1,0 +1,441 @@
+/**
+ * CELLULOID. Boot, the frame, and the glue between physics events and everything that reacts
+ * to them: rules, sound, effects, the crowd, the camera, the interface, and the bots.
+ *
+ * The __GAME__ contract at the bottom is what the jam gate reads: pos is the paddle in metres,
+ * fps is from real elapsed time, draws and tris come from the renderer.
+ */
+import * as THREE from 'three';
+import { preloadAssets } from '../assetlib.js';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, PADDLE, PALETTE, clamp } from './consts.js';
+import { BallState, stepWorld, predict } from './physics.js';
+import { PlayerPaddle } from './player.js';
+import { Input } from './input.js';
+import { Match } from './rules.js';
+import { Bot } from './bots.js';
+import { AudioEngine } from './audio.js';
+import { BallVisual, Impacts } from './fx.js';
+import { NetCloth } from './netcloth.js';
+import { buildArena, ASSET_LIST } from './arena.js';
+import { UI } from './ui.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0e1a);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 120);
+
+const ZERO = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3(), _u = new THREE.Vector3(), _f = new THREE.Vector3();
+
+const G = {
+  ball: new BallState(), paddle: new PlayerPaddle(), match: new Match(), bot: null, level: 'rookie',
+  audio: new AudioEngine(), ui: new UI(), input: null, arena: null, ballVis: null, fx: null, cloth: null,
+  serveX: 0, events: [], time: 0, running: false, ballLive: false, reachZ: null, touch: false,
+  camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
+  shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
+  lastPointT: -10, holdingBall: false, whooshT: 0,
+};
+window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
+window.__READY__ = false;
+
+const isPhone = () => Math.min(window.innerWidth, window.innerHeight) < 600 || Input.prefersTouch();
+
+// ---------------------------------------------------------------- boot
+async function boot() {
+  G.ui.loading(0.03, 'renderer');
+  let n = 0;
+  await Promise.all(ASSET_LIST.map((u) => preloadAssets([u]).then(() => G.ui.loading(0.05 + 0.6 * (++n / ASSET_LIST.length), u.replace('./assets/', '').replace('.js', '')))));
+  G.ui.loading(0.7, 'building the venue');
+  G.arena = await buildArena(scene, { phone: isPhone() });
+  G.ballVis = new BallVisual(G.arena.ball, scene, camera);
+  G.fx = new Impacts(scene);
+  G.cloth = new NetCloth(G.arena.net);
+  setupPaddleVisuals();
+  G.serveMarker = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.06, 32), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
+  G.serveMarker.rotation.x = -Math.PI / 2; G.serveMarker.visible = false; G.serveMarker.renderOrder = 3;
+  scene.add(G.serveMarker);
+  G.input = new Input(canvas, G.paddle, hooks);
+  if (Input.prefersTouch()) { G.input.enableTouch(); }
+  G.ui.setTouch(G.input.touch);
+  wireButtons();
+  G.ui.setLevel(G.level, LEVELS[G.level].name);
+  G.ui.setScore([0, 0], -1, false);
+  resize();
+  window.addEventListener('resize', resize);
+  G.ui.loading(1, 'ready');
+  G.ui.hideLoading();
+  G.ui.showStart();
+  placeIdle();
+  window.__GAME__.state = 'MENU';
+  window.__READY__ = true;
+  window.__START__ = () => startGame(G.level);
+  requestAnimationFrame(frame);
+}
+
+function wireButtons() {
+  for (const b of document.querySelectorAll('.lv')) b.addEventListener('click', () => { G.level = b.dataset.level; G.ui.setLevel(G.level, LEVELS[G.level].name); G.audio.ui(); });
+  G.ui.e.startb.addEventListener('click', () => startGame(G.level));
+  G.ui.e.overb.addEventListener('click', () => startGame(G.level));
+  G.ui.e.menub.addEventListener('click', () => { G.running = false; G.ui.hideOver(); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; });
+  G.ui.e.mute.addEventListener('click', () => hooks.mute());
+}
+
+const hooks = {
+  chargeStart() { if (!G.running) return; if (G.paddle.startCharge()) { G.audio.init(); G.audio.chargeStart(); } },
+  release() { if (!G.running) return; const p = G.paddle.release(); if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; } },
+  toss() {
+    if (!G.running) return;
+    const m = G.match;
+    if (m.state !== 'SERVE_WAIT' || m.server !== 0) return;
+    const hand = handPos(_a, G.serveX);
+    G.ball.set(hand, _b.set(0, SERVE.tossV, 0));
+    m.toss(); G.ballLive = true; G.holdingBall = false;
+    G.audio.init(); G.audio.toss();
+    G.ui.hint(''); G.ui.tossVisible(false); G.serveMarker.visible = false;
+  },
+  serveNudge(dx) { G.serveX = clamp(G.serveX + dx, -SERVE.xMax, SERVE.xMax); },
+  level(key) { if (!G.running) { G.level = key; G.ui.setLevel(key, LEVELS[key].name); } },
+  restart() { if (G.running || G.match.over) startGame(G.level); },
+  mute() { G.audio.init(); G.audio.setMuted(!G.audio.muted); G.ui.e.mute.textContent = G.audio.muted ? 'SOUND OFF' : 'SOUND ON'; },
+  menu() { if (!G.running) return; G.running = false; G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; },
+  touchMode(on) { G.touch = on; G.ui.setTouch(on); },
+};
+
+function handPos(out, x) { return out.set(x, TABLE.H + SERVE.handY, SERVE.handZ); }
+
+function setupPaddleVisuals() {
+  G.padVis = [];
+  for (let i = 0; i < 2; i++) {
+    const inst = G.arena.paddles[i];
+    const pivot = new THREE.Group();
+    inst.position.set(0, -PADDLE.centerY, 0);
+    pivot.add(inst);
+    scene.add(pivot);
+    G.padVis.push(pivot);
+  }
+  G.chargeRing = new THREE.Mesh(new THREE.RingGeometry(0.105, 0.118, 48), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  G.chargeRing.renderOrder = 4;
+  G.padVis[0].add(G.chargeRing);
+  G.playerRubber = [];
+  G.arena.paddles[0].traverse((o) => { if (o.isMesh && !o.userData.hull && o.material.name === 'fabric') G.playerRubber.push(o.material); });
+}
+
+function placeIdle() {
+  G.paddle.pos.set(0, PLAYER.yNeutral, PLAYER.z0); G.paddle.posPrev.copy(G.paddle.pos);
+  G.ball.set(_a.set(0.2, TABLE.H + 0.12, -SERVE.handZ), ZERO);
+  G.ballLive = false; G.holdingBall = true;
+}
+
+function startGame(level) {
+  G.level = level;
+  G.audio.init();
+  G.ui.hideStart(); G.ui.hideOver();
+  G.ui.setLevel(level, LEVELS[level].name);
+  G.match.startGame(1);
+  G.bot = new Bot(level);
+  G.paddle.assist = LEVELS[level].assist;
+  G.running = true; G.hits = 0; G.overTimer = -1; G.reachZ = null; G.serveX = 0;
+  G.ui.setScore([0, 0], G.match.server, false);
+  G.ui.gamePoint(-1); G.ui.rally(0);
+  G.arena.setLevel(0);
+  onNewServe();
+  window.__GAME__.state = 'PLAY';
+}
+
+function onNewServe() {
+  const m = G.match;
+  G.ballLive = false; G.holdingBall = true; G.reachZ = null;
+  G.ui.setScore(m.score, m.server);
+  G.ui.gamePoint(m.gamePoint());
+  if (m.server === 0) {
+    G.serveX = clamp(G.serveX, -SERVE.xMax, SERVE.xMax);
+    G.ui.hint(G.input.touch ? 'TAP TOSS · SECOND FINGER HOLDS AND RELEASES TO SWING' : 'W TO TOSS · ← → TO PLACE · HOLD CLICK, RELEASE TO SWING');
+    G.ui.tossVisible(true);
+    G.serveMarker.visible = true;
+  } else {
+    G.ui.hint(''); G.ui.tossVisible(false); G.serveMarker.visible = false;
+  }
+}
+
+// ---------------------------------------------------------------- the frame
+let prevT = null, fpsAcc = 0, fpsN = 0, fpsShow = 60;
+function frame(tMs) {
+  requestAnimationFrame(frame);
+  const now = tMs / 1000;
+  const realDt = prevT === null ? 1 / 60 : Math.min(0.25, now - prevT);
+  prevT = now;
+  fpsAcc += realDt; fpsN++;
+  if (fpsAcc >= 0.5) { fpsShow = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; adaptQuality(); }
+  const dt = Math.min(realDt, 1 / 30);
+  G.time += dt;
+  if (G.running) update(dt, now, realDt); else idle(dt, now);
+  updateCamera(dt);
+  renderer.render(scene, camera);
+  telemetry();
+}
+
+function idle(dt, now) {
+  G.paddle.update(dt);
+  updatePaddleVisual(G.padVis[0], G.paddle.pos, G.paddle.normal, G.paddle.flip);
+  if (G.bot) updatePaddleVisual(G.padVis[1], G.bot.visualPos(_a), G.bot.normal, G.bot.flip);
+  else updatePaddleVisual(G.padVis[1], _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 0);
+  G.ballVis.update(dt, G.ball, now, true, TABLE.H);
+  G.fx.update(dt);
+  G.cloth.update(dt);
+  G.arena.crowd.update(dt, 0.1, 0);
+  G.audio.update(dt, { rally: 0, tension: false, live: false, running: false });
+}
+
+function update(dt, now, realDt) {
+  const { ball, paddle, match, bot } = G;
+  G.input.update(dt);
+  // the player serves: the ball waits in the hand
+  if (match.state === 'SERVE_WAIT' && match.server === 0) {
+    ball.set(handPos(_a, G.serveX), ZERO);
+    G.serveMarker.position.set(G.serveX, TABLE.H + 0.003, TABLE.halfL - 0.04);
+  }
+  // paddles
+  paddle.reachZ = G.reachZ;
+  if (paddle.charging) G.audio.chargeLevel(paddle.charge);
+  paddle.update(realDt > 0.05 ? realDt : dt);
+  bot.update(dt, ball, match, now, paddle.pos.x, G.events);
+  if (match.state === 'TOSS' && match.server === 1) G.ballLive = true;
+  // physics
+  if (G.ballLive) {
+    stepWorld(ball, [paddle], dt, G.events, Math.random);
+    const out = match.checkOut(ball);
+    if (out) handleOutcome(out, now);
+    const dead = (ball.p.y - BALL.R < FLOOR_Y + 0.01 && ball.v.length() < 0.5) || Math.abs(ball.p.x) > 7 || Math.abs(ball.p.z) > 8 || ball.p.y < -1;
+    if (dead) {
+      if (match.state === 'IN_PLAY') { const o = match.onEvent({ type: 'gone' }, now); if (o) handleOutcome(o, now); }
+      if (match.state === 'TOSS') { match.tossFailed(); onNewServe(); }
+      G.ballLive = false;
+    }
+  }
+  for (const e of G.events) handleEvent(e, now);
+  G.events.length = 0;
+  const tr = match.update(dt);
+  if (tr === 'serve') onNewServe();
+  if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
+  // whoosh on a fast swing
+  if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
+  // visuals
+  updatePaddleVisual(G.padVis[0], paddle.pos, paddle.normal, paddle.flip);
+  updatePaddleVisual(G.padVis[1], bot.visualPos(_a), bot.normal, bot.flip);
+  const ch = paddle.charging ? paddle.charge : 0;
+  G.chargeRing.material.opacity = ch * 0.85 + (ch >= 0.999 ? 0.15 * Math.sin(G.time * 30) : 0);
+  G.chargeRing.scale.setScalar(0.75 + 0.55 * ch);
+  for (const m of G.playerRubber) { m.emissive.setHex(PALETTE.cyan); m.emissiveIntensity = ch * 0.55; }
+  G.ui.charge(ch, paddle.charging);
+  const showBall = G.ballLive || G.holdingBall || match.state === 'SERVE_WAIT';
+  G.ballVis.update(dt, ball, now, showBall, TABLE.H);
+  G.fx.update(dt);
+  G.cloth.update(dt);
+  const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
+  G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
+  G.arena.setLevel(rallyLvl);
+  G.ui.rally(match.rally);
+  const tension = match.gamePoint() >= 0 && match.state !== 'POINT_OVER' && match.state !== 'GAME_OVER';
+  G.audio.update(dt, { rally: match.rally, tension, live: G.ballLive, running: true });
+}
+
+function computeReach() {
+  const r = predict(G.ball, { maxT: 2.5, sample: true, until: (b, t, ev) => b.p.z > 2.3 || ev.filter((x) => x.type === 'table').length >= 2 || ev.some((x) => x.type === 'netin' || x.type === 'floor') });
+  const tb = r.events.find((e) => e.type === 'table' && e.side === 0);
+  if (!tb) { G.reachZ = null; return; }
+  const second = r.events.find((e) => e.t > tb.t && (e.type === 'table' || e.type === 'floor'));
+  const t2 = second ? second.t : r.t;
+  const after = r.samples.filter((s) => s.t > tb.t && s.t < t2);
+  if (after.some((s) => s.z >= PLAYER.z0)) { G.reachZ = null; return; }
+  let apex = after[0];
+  for (const s of after) if (s.y > apex.y) apex = s;
+  G.reachZ = apex ? clamp(apex.z, PLAYER.reachMin, PLAYER.z0) : null;
+}
+
+/** After the player's contact: if the ball would miss by a little, bend it into a legal shot. */
+function applyAssist(isServe) {
+  const cfg = LEVELS[G.level];
+  const b = G.ball;
+  const legal = (state) => {
+    const r = predict(state, { maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
+    if (r.events.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip')) return false;
+    const tables = r.events.filter((x) => x.type === 'table');
+    if (isServe) return tables.length >= 2 && tables[0].side === 0 && tables[1].side === 1;
+    return tables.length >= 1 && tables[0].side === 1;
+  };
+  if (legal(b)) return 'clean';
+  const speed = b.v.length();
+  if (speed < 0.8) return 'none';
+  const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl), ph0 = Math.atan2(b.v.x, b.v.z);
+  const maxA = cfg.assistAngle;
+  const cand = [];
+  for (const dth of [0.03, -0.03, 0.06, -0.06, 0.1, -0.1, 0.15, -0.15, 0.22, -0.22, 0.3, -0.3]) if (Math.abs(dth) <= maxA + 1e-6) for (const sf of [1, 0.93, 1.07, 0.85]) cand.push({ dth, dph: 0, sf, cost: Math.abs(dth) + Math.abs(1 - sf) * 0.6 });
+  for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.06, -0.06]) cand.push({ dth, dph, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
+  cand.sort((x, y) => x.cost - y.cost);
+  const trial = new BallState();
+  for (const c of cand) {
+    const th = th0 + c.dth, ph = ph0 + c.dph, s = speed * c.sf;
+    trial.copy(b);
+    trial.v.set(s * Math.cos(th) * Math.sin(ph), s * Math.sin(th), s * Math.cos(th) * Math.cos(ph));
+    if (legal(trial)) { b.v.copy(trial.v); return 'assisted'; }
+  }
+  return 'none';
+}
+
+function handleEvent(e, now) {
+  const { match, paddle, bot, audio, fx, ballVis, ui, cloth } = G;
+  switch (e.type) {
+    case 'paddle': {
+      const isPlayer = e.owner === 0;
+      const res = match.onEvent(e, now);
+      const timing = isPlayer ? paddle.timing() : { kind: e.quality || 'GOOD' };
+      let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
+      if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
+        const a = applyAssist(!!(res && res.serve));
+        if (a === 'assisted' && q === 'PERFECT') q = 'GOOD';
+        computeReachLater();
+      }
+      audio.paddle(e.speedIn + e.padSpeed * 0.5, { quality: q, edge: e.edge, slip: e.slip, brush: e.brush });
+      fx.impact(e.point, e.normal, q, e.speedOut);
+      ballVis.impact(e.normal, clamp(e.speedIn / 30, 0.1, 0.4));
+      if (e.speedOut > 17) { G.shake = Math.max(G.shake, 0.012 + (e.speedOut - 17) * 0.0015); G.camKick += 1.2; }
+      if (isPlayer) { G.hits++; G.reachZ = null; if (q === 'PERFECT' || q === 'EDGE' || q === 'THIN') ui.quality(q); if (q === 'PERFECT') ui.flash('rgba(79,227,255,0.10)'); }
+      else if (e.kind === 'smash') ui.flash('rgba(255,122,48,0.08)');
+      bot.onBallEvent(e, G.ball, match, now);
+      if (res) handleOutcome(res, now);
+      break;
+    }
+    case 'table': {
+      audio.table(e.speed, e);
+      fx.impact(_a.set(e.x, TABLE.H, e.z), UP, e.edge ? 'EDGE' : 'BOUNCE', e.speed);
+      ballVis.impact(UP, clamp(e.speed / 20, 0.08, 0.3));
+      if (e.edge) ui.toast('EDGE', 'edge', 700);
+      const res = match.onEvent(e, now);
+      bot.onBallEvent(e, G.ball, match, now);
+      if (e.side === 0 && match.state === 'IN_PLAY' && match.lastHitter === 1) computeReach();
+      if (res) handleOutcome(res, now);
+      break;
+    }
+    case 'netclip': {
+      audio.net('clip', e.speed);
+      cloth.impulse(e.x, e.y, e.dir, 0.02 + 0.04 * e.depth);
+      fx.impact(_a.set(e.x, e.y, 0), _n.set(0, 0, -e.dir), 'NET', 6);
+      ui.toast('NET CORD', 'net', 800);
+      const res = match.onEvent(e, now);
+      bot.onBallEvent(e, G.ball, match, now);
+      if (res) handleOutcome(res, now);
+      break;
+    }
+    case 'netin': {
+      audio.net('in', e.speed);
+      cloth.impulse(e.x, e.y, e.dir, 0.04 + 0.05 * clamp(e.speed / 15, 0, 1), 0.3);
+      const res = match.onEvent(e, now);
+      if (res) handleOutcome(res, now);
+      break;
+    }
+    case 'nearmiss': audio.net('zip', e.speed); cloth.impulse(e.x, e.y, e.dir, 0.004, 0.1); break;
+    case 'post': { audio.net('post'); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
+    case 'floor': { audio.floor(e.speed); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
+    case 'ceiling': { const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
+    case 'under': audio.table(e.speed * 0.5); break;
+    case 'toss': audio.toss(); break;
+    default: break;
+  }
+}
+let reachPending = false;
+function computeReachLater() { reachPending = true; }
+
+function handleOutcome(res, now) {
+  const { match, ui, audio, arena } = G;
+  if (res.serve !== undefined) { ui.hint(''); ui.tossVisible(false); G.serveMarker.visible = false; return; }
+  if (res.tossFailed) { onNewServe(); return; }
+  if (res.legal !== undefined) {
+    if (res.rally >= 4 && res.rally % 4 === 0) ui.toast(`${res.rally}`, 'rally', 500);
+    return;
+  }
+  if (res.let) { ui.toast('LET', 'let'); return; }
+  if (res.point !== undefined) {
+    const win = res.point === 0;
+    const gp = match.lastPoint && match.lastPoint.gamePoint >= 0;
+    ui.toast(res.reason, win ? 'win' : 'lose', res.gameOver ? 2500 : 1300);
+    ui.setScore(match.score, match.server);
+    ui.pulseSide(res.point);
+    audio.point(win, gp || !!res.gameOver);
+    audio.cheer(win ? (gp ? 1 : 0.55) : 0.25);
+    arena.crowd.update(0, 0, win ? 1 : 0.35);
+    ui.flash(win ? 'rgba(79,227,255,0.22)' : 'rgba(255,122,48,0.12)');
+    G.shake = Math.max(G.shake, win ? 0.02 : 0.008);
+    G.lastPointT = now; G.reachZ = null;
+    ui.gamePoint(-1);
+    if (res.gameOver) { audio.gameOver(win); G.overTimer = 2.4; window.__GAME__.over = true; }
+  }
+}
+
+function updatePaddleVisual(pivot, pos, normal, flip) {
+  pivot.position.copy(pos);
+  _n.copy(normal).normalize();
+  _u.copy(UP).addScaledVector(_n, -_n.y).normalize();
+  const th = flip * Math.PI;
+  _f.copy(_n).multiplyScalar(Math.cos(th)).addScaledVector(_c.crossVectors(_u, _n), Math.sin(th));
+  _b.copy(pos).add(_f);
+  pivot.up.set(0, 1, 0);
+  pivot.lookAt(_b);
+}
+
+// ---------------------------------------------------------------- camera
+function layoutCamera() {
+  const a = window.innerWidth / window.innerHeight;
+  if (a < 0.85) { G.camBase.set(0, 2.6, 3.6); G.lookBase.set(0, 0.5, -0.6); G.fovBase = 68; }
+  else if (a < 1.3) { G.camBase.set(0, 2.15, 3.5); G.lookBase.set(0, 0.6, -0.4); G.fovBase = 56; }
+  else { G.camBase.set(0, 1.85, 3.4); G.lookBase.set(0, 0.7, -0.35); G.fovBase = 48; }
+}
+const _camT = new THREE.Vector3(), _lookT = new THREE.Vector3();
+function updateCamera(dt) {
+  const p = G.paddle;
+  const px = G.running ? p.pos.x : 0;
+  const bx = G.ballLive ? clamp(G.ball.p.x, -1, 1) : 0;
+  const ch = p.charging ? p.charge : 0;
+  _camT.copy(G.camBase).add(_a.set(px * 0.15 + bx * 0.05, -0.05 * ch, 0.1 * ch));
+  _lookT.copy(G.lookBase).add(_a.set(px * 0.08 + bx * 0.12, 0, 0));
+  const k = 1 - Math.exp(-6 * dt);
+  camera.position.lerp(_camT, k); G.look.lerp(_lookT, k);
+  const rallyZoom = clamp((G.match.rally - 4) / 12, 0, 1) * 4;
+  const fov = G.fovBase - rallyZoom - ch * 2.5 + G.camKick;
+  camera.fov += (fov - camera.fov) * (1 - Math.exp(-8 * dt));
+  camera.updateProjectionMatrix();
+  camera.lookAt(G.look);
+  if (G.shake > 0.0005) { camera.position.x += (Math.random() - 0.5) * G.shake; camera.position.y += (Math.random() - 0.5) * G.shake; G.shake *= Math.exp(-11 * dt); }
+  G.camKick *= Math.exp(-10 * dt);
+}
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  layoutCamera();
+  camera.updateProjectionMatrix();
+}
+function adaptQuality() {
+  if (G.dprDropped) return;
+  if (fpsShow < 28 && G.running) { G.lowFpsT += 0.5; if (G.lowFpsT >= 3) { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25)); resize(); G.dprDropped = true; } }
+  else G.lowFpsT = 0;
+}
+
+// ---------------------------------------------------------------- telemetry
+function telemetry() {
+  if (reachPending) { reachPending = false; if (G.match.state === 'IN_PLAY' && G.match.lastHitter === 1) computeReach(); }
+  const g = window.__GAME__, r = renderer.info.render, m = G.match;
+  g.pos = [G.paddle.pos.x, G.paddle.pos.y];
+  g.fps = fpsShow; g.speed = G.ballLive ? G.ball.v.length() : 0;
+  g.score = m.score; g.over = m.over; g.rally = m.rally; g.hits = G.hits; g.points = m.totalPoints;
+  g.draws = r.calls; g.tris = r.triangles;
+  g.ball = [G.ball.p.x, G.ball.p.y, G.ball.p.z]; g.spin = G.ball.w.length();
+  g.level = G.level; g.server = m.server; g.match = m.state; g.live = G.ballLive;
+  if (G.ui.e.perf.classList.contains('on')) G.ui.perf(`${fpsShow} fps · ${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris`);
+}
+
+boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });

@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>CELLULOID</title>
+<link rel="icon" href="data:,">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<style>
+  :root { --cyan:#4fe3ff; --orange:#ff7a30; --ink:#0b0e1a; --paper:#f2f2ee; --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--ink); color:var(--paper);
+              font-family:"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-user-select:none; user-select:none; }
+  canvas#c { display:block; width:100%; height:100%; touch-action:none; cursor:crosshair; }
+  .pe { pointer-events:auto; }
+  .cond { font-weight:800; letter-spacing:.14em; text-transform:uppercase; }
+
+  /* loading */
+  #load { position:fixed; inset:0; z-index:50; background:var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; transition:opacity .4s; }
+  #load.off { opacity:0; pointer-events:none; }
+  #load h1 { margin:0; font-size:clamp(34px,8vw,64px); font-weight:900; letter-spacing:.32em; text-indent:.32em; }
+  #bar { width:min(320px,60vw); height:2px; background:#232842; overflow:hidden; }
+  #barf { height:100%; width:0; background:var(--cyan); transition:width .15s linear; }
+  #loadmsg { font-size:11px; letter-spacing:.2em; color:#6b7390; text-transform:uppercase; }
+
+  /* screens */
+  .screen { position:fixed; inset:0; z-index:40; display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center;
+            background:radial-gradient(ellipse at 50% 40%, rgba(11,14,26,.55), rgba(11,14,26,.92)); padding:24px; }
+  .screen.on { display:flex; }
+  .screen h2 { margin:0; font-size:clamp(30px,7vw,60px); font-weight:900; letter-spacing:.3em; text-indent:.3em; }
+  .screen .sub { font-size:12px; letter-spacing:.3em; color:var(--cyan); text-transform:uppercase; }
+  .screen p { margin:0; font-size:13px; line-height:1.9; color:#9aa3bd; max-width:min(520px,88vw); }
+  .screen p small { font-size:11px; letter-spacing:.12em; color:#6b7390; }
+  .btn { padding:14px 30px; border:1px solid #3a4262; background:rgba(11,14,26,.8); color:var(--paper); font:inherit; font-size:14px; font-weight:800; letter-spacing:.24em; text-indent:.24em; cursor:pointer; text-transform:uppercase; }
+  .btn:hover, .btn.sel { border-color:var(--cyan); color:var(--cyan); }
+  .btn.big { padding:18px 52px; background:var(--cyan); color:var(--ink); border-color:var(--cyan); font-size:16px; }
+  .btn.big:hover { background:#8df0ff; color:var(--ink); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .lv { min-width:118px; }
+  .lv small { display:block; font-size:9px; letter-spacing:.18em; color:#6b7390; margin-top:4px; }
+  .lv.sel small { color:var(--cyan); }
+  kbd { border:1px solid #3a4262; padding:1px 6px; border-radius:2px; color:#c9d0e6; font-size:11px; font-family:inherit; }
+  body.touch #hint-desktop { display:none; }
+  body:not(.touch) #hint-touch { display:none; }
+
+  /* hud */
+  #ui { position:fixed; inset:0; pointer-events:none; z-index:20; }
+  #hud { position:absolute; inset:0; display:none; }
+  #hud.on { display:block; }
+  #bug { position:absolute; top:calc(var(--sat) + 10px); left:50%; transform:translateX(-50%); display:flex; align-items:stretch; height:44px;
+         background:rgba(8,10,20,.82); border:1px solid rgba(255,255,255,.08); border-bottom:2px solid var(--cyan); border-radius:3px; overflow:hidden; }
+  #bug .name { display:flex; align-items:center; padding:0 14px; font-size:12px; font-weight:800; letter-spacing:.2em; color:#c9d0e6; min-width:88px; justify-content:center; }
+  #bug .name.you { background:rgba(79,227,255,.10); }
+  #bug .name.cpu { background:rgba(255,122,48,.10); }
+  #bug .num { position:relative; width:46px; overflow:hidden; font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; }
+  #bug .num span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  #bug .num span.out { animation:numOut .36s cubic-bezier(.3,.7,.2,1) forwards; }
+  #bug .num span.in { animation:numIn .46s cubic-bezier(.34,1.56,.64,1) forwards; }
+  #bug .num.won::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2px; background:var(--paper); animation:wonBar .8s ease-out forwards; }
+  @keyframes numOut { to { transform:translateY(-110%); opacity:0; } }
+  @keyframes numIn { from { transform:translateY(110%); } 70% { transform:translateY(-6%) scale(1.06); } to { transform:translateY(0) scale(1); } }
+  @keyframes wonBar { from { opacity:1; } to { opacity:0; } }
+  #bug .dots { display:flex; flex-direction:column; justify-content:center; gap:4px; padding:0 4px; }
+  #bug .dot { width:5px; height:5px; border-radius:50%; background:#2b3352; }
+  #bug .dot.on { background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+  #bug .sep { display:flex; align-items:center; color:#3a4262; font-size:18px; padding:0 2px; }
+  #gp { position:absolute; top:calc(var(--sat) + 60px); left:50%; transform:translateX(-50%); font-size:10px; letter-spacing:.34em; text-indent:.34em; color:var(--orange); opacity:0; transition:opacity .4s; }
+  #gp.on { opacity:1; animation:gpPulse 1.6s ease-in-out infinite; }
+  @keyframes gpPulse { 50% { opacity:.45; } }
+  #rally { position:absolute; left:50%; bottom:calc(var(--sab) + 84px); transform:translateX(-50%); font-size:34px; font-weight:900; color:rgba(242,242,238,.28); opacity:0; transition:opacity .3s; font-variant-numeric:tabular-nums; }
+  #rally.on { opacity:1; }
+  #rally.hot { color:rgba(255,122,48,.6); }
+  #toast { position:absolute; left:0; right:0; top:34%; text-align:center; font-size:clamp(20px,4.6vw,40px); font-weight:900; letter-spacing:.3em; text-indent:.3em; opacity:0; text-shadow:0 2px 14px rgba(0,0,0,.6); }
+  #toast.on { opacity:1; }
+  #toast.anim { animation:toastIn .5s cubic-bezier(.2,1.4,.4,1) forwards; }
+  #toast.win { color:var(--cyan); } #toast.lose { color:var(--orange); } #toast.rally { color:rgba(242,242,238,.5); font-size:22px; }
+  #toast.net, #toast.edge, #toast.let { color:#e6d27a; font-size:16px; }
+  @keyframes toastIn { from { transform:translateY(12px) scale(.9); opacity:0; } to { transform:none; opacity:1; } }
+  #quality { position:absolute; left:50%; bottom:calc(var(--sab) + 150px); transform:translateX(-50%); font-size:12px; letter-spacing:.34em; text-indent:.34em; opacity:0; }
+  #quality.anim { animation:qIn .7s ease-out forwards; }
+  #quality.q-perfect { color:var(--cyan); } #quality.q-edge { color:var(--orange); } #quality.q-thin { color:#e6d27a; }
+  @keyframes qIn { 0% { opacity:0; transform:translate(-50%,6px); } 15% { opacity:1; transform:translate(-50%,0); } 80% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-8px); } }
+  #hint { position:absolute; left:0; right:0; bottom:calc(var(--sab) + 26px); text-align:center; font-size:10px; letter-spacing:.24em; color:#8a93b0; opacity:0; transition:opacity .3s; padding:0 12px; }
+  #hint.on { opacity:1; }
+  #charge { position:absolute; left:50%; bottom:calc(var(--sab) + 56px); transform:translateX(-50%); width:min(220px,50vw); height:3px; background:rgba(255,255,255,.12); opacity:0; transition:opacity .15s; }
+  #charge.on { opacity:1; }
+  #chargef { height:100%; width:100%; background:var(--cyan); transform-origin:left; transform:scaleX(0); box-shadow:0 0 8px var(--cyan); }
+  #charge.full #chargef { background:#fff; animation:full .18s ease-in-out infinite alternate; }
+  @keyframes full { to { box-shadow:0 0 18px #fff; } }
+  #flash { position:fixed; inset:0; z-index:15; pointer-events:none; opacity:0; }
+  #flash.on { animation:flashOut .5s ease-out forwards; }
+  @keyframes flashOut { from { opacity:1; } to { opacity:0; } }
+  #vig { position:fixed; inset:0; z-index:14; pointer-events:none; opacity:0; transition:opacity 1.2s; background:radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,.6) 100%); }
+  #vig.on { opacity:1; }
+  #perf { position:absolute; right:12px; top:calc(var(--sat) + 12px); font-size:10px; color:#6b7390; display:none; }
+  #perf.on { display:block; }
+  #mute { position:absolute; left:12px; top:calc(var(--sat) + 12px); font-size:9px; letter-spacing:.2em; color:#6b7390; background:none; border:1px solid #2b3352; padding:6px 8px; cursor:pointer; font-family:inherit; }
+
+  /* touch */
+  #touch { position:fixed; inset:0; z-index:18; display:none; }
+  body.touch #touch { display:block; }
+  #stick { position:absolute; left:0; right:0; top:0; bottom:0; }
+  #toss { position:absolute; right:max(18px,env(safe-area-inset-right)); bottom:calc(var(--sab) + 96px); width:84px; height:84px; border-radius:50%; display:none; align-items:center; justify-content:center;
+          border:2px solid var(--cyan); background:rgba(79,227,255,.14); color:var(--cyan); font-size:12px; font-weight:800; letter-spacing:.2em; text-indent:.2em; font-family:inherit; }
+  #toss.on { display:flex; animation:tossPulse 1.4s ease-in-out infinite; }
+  @keyframes tossPulse { 50% { box-shadow:0 0 0 10px rgba(79,227,255,.12); } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="load">
+  <h1>CELLULOID</h1>
+  <div id="bar"><div id="barf"></div></div>
+  <div id="loadmsg">warming up</div>
+</div>
+
+<div id="ui">
+  <div id="hud">
+    <div id="bug">
+      <div class="name you">YOU</div>
+      <div class="num" id="s0"><span class="cur">0</span></div>
+      <div class="dots"><div class="dot" id="d0"></div><div class="dot" id="d1"></div></div>
+      <div class="num" id="s1"><span class="cur">0</span></div>
+      <div class="name cpu" id="cpuname">ROOKIE</div>
+    </div>
+    <div id="gp"></div>
+    <div id="rally"></div>
+    <div id="toast"></div>
+    <div id="quality"></div>
+    <div id="charge"><div id="chargef"></div></div>
+    <div id="hint"></div>
+    <div id="perf"></div>
+    <button id="mute" class="pe">SOUND ON</button>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="vig"></div>
+
+<div id="touch">
+  <div id="stick" class="pe"></div>
+  <button id="toss" class="pe">TOSS</button>
+</div>
+
+<div class="screen" id="start">
+  <div class="sub">table tennis</div>
+  <h2>CELLULOID</h2>
+  <div class="row">
+    <button class="btn lv pe sel" data-level="rookie">ROOKIE<small>blocks and pushes</small></button>
+    <button class="btn lv pe" data-level="club">CLUB<small>loops the corners</small></button>
+    <button class="btn lv pe" data-level="pro">PRO<small>takes it on the rise</small></button>
+  </div>
+  <button class="btn big pe" id="startb">PLAY</button>
+  <p id="hint-desktop">mouse moves the paddle · <kbd>hold click</kbd> charges, release swings · flick at contact for spin<br><kbd>W</kbd> tosses your serve · <kbd>←</kbd> <kbd>→</kbd> place the toss · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> opponent · <kbd>M</kbd> mute</p>
+  <p id="hint-touch">one finger drags the paddle · a second finger held charges, lifted swings · flick at contact for spin<br>tap TOSS to serve</p>
+  <p><small>first to 11, two clear · CPU serves first</small></p>
+</div>
+
+<div class="screen" id="over">
+  <div class="sub">final</div>
+  <h2 id="overh">GAME</h2>
+  <p id="overp"></p>
+  <div class="row"><button class="btn big pe" id="overb">REMATCH</button><button class="btn pe" id="menub">MENU</button></div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
