@@ -139,17 +139,6 @@ function setupPaddleVisuals() {
     scene.add(pivot);
     G.padVis.push(pivot); G.bladeG.push(bladeG);
   }
-  // the player's hand grips the handle; the forearm runs down and toward the camera
-  if (G.arena.hand) {
-    const hp = new THREE.Group();
-    const gripMid = G.arena.paddles[0].userData.blade ? G.arena.paddles[0].userData.blade.gripMidY : -0.124;
-    hp.position.set(0, gripMid, 0);
-    const gy = G.arena.hand.userData.hand ? G.arena.hand.userData.hand.gripY : 0.375;
-    G.arena.hand.position.set(0, -gy, 0);
-    hp.add(G.arena.hand);
-    G.padVis[0].add(hp);
-    G.handPivot = hp;
-  }
   // two fading ghosts of the blade, shown during the forward swing
   for (let k = 0; k < 2; k++) {
     const gm = new THREE.Mesh(new THREE.CircleGeometry(0.076, 28), new THREE.MeshBasicMaterial({ color: 0xd2232a, transparent: true, opacity: 0.32 - k * 0.14, depthWrite: false, side: THREE.DoubleSide }));
@@ -488,9 +477,11 @@ function updatePaddleVisual(i, pos, normal, faceToward, flip, cock = 0, tremble 
   pivot.up.set(0, 1, 0);
   pivot.lookAt(_b);
   const side = 1 - 2 * flip;                       // +1 forehand, -1 backhand
-  pivot.rotateZ((i === 0 ? 1 : -1) * side * 0.55);   // the handle leans toward the hand
+  // a ready position: the blade leans back so its top rim shows and the grip comes toward
+  // you, foreshortened; the handle leans a little toward the hand that is not drawn
+  pivot.rotateX(-0.22);
+  pivot.rotateZ((i === 0 ? 1 : -1) * side * 0.18);
   G.bladeG[i].rotation.y = flip * Math.PI;         // the other face comes round on a backhand
-  if (i === 0 && G.handPivot) G.handPivot.rotation.set(-0.95, 0, 0.2 * side);
   if (cock > 0) {
     // the wrist cocks: the blade tilts back and swings out to the side, then whips through
     pivot.rotateX(-0.85 * cock);

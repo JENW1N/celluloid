@@ -1,5 +1,5 @@
 /**
- * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 5.5 mm, with a 5 mm wood lip
+ * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 6.5 mm, with a 6.5 mm wood lip
  * showing around the rubber; each face carries a sponge layer under its topsheet so the rim
  * reads as two layers: red on +Z, black on -Z, 13.5 mm in all. The grip is a flared profile
  * with darker scales on both faces, two wood wings where it meets the blade, and a rounded
@@ -10,16 +10,16 @@ export default function (THREE) {
   const g = new THREE.Group();
   const mat = (color, name, roughness = 0.7, metalness = 0) =>
     new THREE.MeshStandardMaterial({ color, roughness, metalness, name });
-  const ply = mat(0xe2c391, 'timber', 0.55);
+  const ply = mat(0xeed2a4, 'timber', 0.55);
   const grip = mat(0xc9a06a, 'timber', 0.6);
   const scale = mat(0x7d4f2b, 'timber', 0.7);
-  const red = mat(0xe0262d, 'fabric', 0.9);
+  const red = mat(0xc8202b, 'fabric', 0.9);
   const redSponge = mat(0x8c1f26, 'fabric', 0.95);
-  const black = mat(0x1b1b21, 'fabric', 0.9);
+  const black = mat(0x1a1a1f, 'fabric', 0.9);
   const blackSponge = mat(0x30303f, 'fabric', 0.95);
   const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); g.add(mesh); return mesh; };
 
-  const RX = 0.075, RY = 0.0785, HL = 0.10, T = 0.0055, LIP = 0.005;
+  const RX = 0.075, RY = 0.0785, HL = 0.10, T = 0.0065, LIP = 0.0065;
   const ellipse = (rx, ry) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0); return s; };
   const slab = (rx, ry, depth) => new THREE.ExtrudeGeometry(ellipse(rx, ry), { depth, bevelEnabled: false, curveSegments: 32 });
 

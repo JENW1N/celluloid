@@ -88,7 +88,7 @@ export class PlayerPaddle {
     // the wrist: aim at the far side, close when high, open when low
     const yawT = -Math.atan2(this.pos.x, this.pos.z - TILT.aimZ);
     const dy = this.pos.y - TILT.yRef;
-    const pitchT = dy > 0 ? -Math.min(TILT.maxClose, dy * TILT.closeRate) : Math.min(TILT.maxOpen, -dy * TILT.openRate);
+    const pitchT = TILT.ready + (dy > 0 ? -Math.min(TILT.maxClose, dy * TILT.closeRate) : Math.min(TILT.maxOpen, -dy * TILT.openRate));
     const kr = 1 - Math.exp(-20 * dt);
     this.yaw += (yawT - this.yaw) * kr;
     this.pitch += (pitchT - this.pitch) * kr;

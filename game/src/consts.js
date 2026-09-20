@@ -22,7 +22,7 @@ export const PADDLE = { rx: 0.075, ry: 0.0785, r: 0.077, thick: 0.013, centerY: 
 
 export const PLAYER = { z0: 1.62, xMax: 1.1, yMin: 0.42, yMax: 2.1, yNeutral: 0.92, reachMin: 0.55, reachMax: 2.0 };
 export const SWING = { chargeTime: 0.55, back: 0.32, forwardT: 0.09, returnT: 0.26, vTap: 2.6, vFull: 10.5 };
-export const TILT = { aimZ: -0.9, yRef: 0.95, closeRate: 1.25, openRate: 1.4, maxClose: 0.75, maxOpen: 0.8 };
+export const TILT = { aimZ: -0.9, yRef: 0.95, closeRate: 1.25, openRate: 1.4, maxClose: 0.75, maxOpen: 0.8, ready: 0.12 };   // ready: the face sits slightly open at rest
 export const SERVE = { handZ: 1.55, handY: 0.16, tossV: 2.2, xMax: 0.9, offsetMax: 0.35, power: 0.5, assist: { angle: 0.35, pace: 0.5, spin: 260 } };   // a 20 cm toss; a serve is never a smash
 
 export const PALETTE = {
