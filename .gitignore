@@ -1,0 +1,8 @@
+_gate/
+_verify/
+_jam/
+_work/
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
