@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import { preloadAssets } from '../assetlib.js';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, PADDLE, PALETTE, clamp } from './consts.js';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js';
 import { BallState, stepWorld, predict } from './physics.js';
 import { PlayerPaddle } from './player.js';
 import { Input } from './input.js';
@@ -42,6 +42,7 @@ const G = {
   shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
   lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [], gatherT: 0, focus: 1, apexCued: false,
   ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [], gameTime: 0, targetRing: null,
+  approach: 1, tCross: null, lastSwing: null,
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
@@ -108,9 +109,13 @@ const hooks = {
     G.audio.chargeEnd(0, true);
   },
   release() {
-    if (!G.running) return;
-    const p = G.paddle.release(G.match.state === 'TOSS' ? SERVE.power : 1);
-    if (p !== null) { G.audio.chargeEnd(p); G.camKick += 1.5 * p; if (p > 0.85) G.shake = Math.max(G.shake, 0.012); }
+    if (!G.running || !G.paddle.charging) return;
+    const serve = G.match.state === 'TOSS';
+    // a release made early waits for the ball (the level says how long); the swing's sound and
+    // kick come when the blade actually moves, from update()
+    const hold = serve ? 0 : swingHoldFor(G.paddle, G.paddle.peakFor(G.paddle.charge));
+    if (!serve && !(G.lastSwing && G.lastSwing.auto && G.lastSwing.t === G.time)) G.lastSwing = { auto: false, tCross: G.tCross, hold, t: G.time, focus: G.focus, approach: G.approach };
+    G.paddle.release(serve ? SERVE.power : 1, hold);
   },
   toss() {
     if (!G.running) return;
@@ -251,11 +256,45 @@ function update(dt, now, realDt) {
     if (Math.abs(dx) < 0.2 && Math.abs(dy) < 0.24) paddle.setTarget(paddle.target.x + dx * 0.65, paddle.target.y + dy * 0.65);
     if (!G.apexCued && ball.v.y < 0.35) { G.apexCued = true; G.audio.tick(); G.ballVis.flash(); }
   } else G.apexCued = false;
+  // leeway: where the ball will cross the blade's plane, how soon, and what the level makes of it
+  const L = LEVELS[G.level];
+  let mx = 0, my = 0, approachT = 1;
+  const meetZ = paddle.meetZ();
+  const incoming = G.ballLive && match.state === 'IN_PLAY' && match.lastHitter === 1 && ball.v.z > 0.5 && ball.p.z < meetZ;
+  G.tCross = null;
+  if (incoming && (L.magnet > 0 || L.approachSlow > 0 || L.autoSwing)) {
+    const zp = meetZ - BALL.R;                                 // where the ball will be met, not where the blade rests
+    const r = predict(ball, { maxT: 0.7, h: 1 / 300, until: (b, t, ev) => b.p.z >= zp || ev.some((x) => x.type === 'floor' || x.type === 'netin') });
+    if (r.stop && r.state.p.z >= zp - 0.02) {
+      const tb = r.t;
+      G.tCross = tb;
+      if (L.approachSlow > 0 && tb < LEEWAY.approachT) approachT = 1 - L.approachSlow * (1 - tb / LEEWAY.approachT);
+      if (L.magnet > 0 && tb < LEEWAY.magnetT) {
+        const dx = r.state.p.x - paddle.target.x, dy = r.state.p.y - paddle.target.y, d = Math.hypot(dx, dy);
+        if (d < L.magnetR) {
+          const f = L.magnet * (1 - tb / LEEWAY.magnetT);
+          mx = dx * f; my = dy * f;
+          const m = Math.hypot(mx, my);
+          if (m > L.magnetMax) { mx *= L.magnetMax / m; my *= L.magnetMax / m; }
+        }
+      }
+      // a charge held as the ball arrives: the wrist snaps on its own, just in time to peak on it
+      if (L.autoSwing && paddle.charging && !serving) {
+        const tr = timeToPeakReal(paddle, paddle.peakFor(paddle.charge));
+        if (tr !== null && tr <= SWING.forwardT * 0.5 + 0.006) { G.lastSwing = { auto: true, tCross: tb, tReal: tr, t: G.time, focus: G.focus, approach: G.approach }; hooks.release(); }
+      }
+    }
+  }
+  paddle.magnet.x += (mx - paddle.magnet.x) * (1 - Math.exp(-16 * dt));
+  paddle.magnet.y += (my - paddle.magnet.y) * (1 - Math.exp(-16 * dt));
   paddle.update(realDt > 0.05 ? realDt : dt, G.ballLive && (match.lastHitter === 1 || match.state === 'TOSS') ? ball : null, serving);
-  // winding up slows the world: focus. The paddle keeps real time, everything else dilates.
+  if (paddle.takeSwingStart()) { const p = paddle.swingPower; G.audio.chargeEnd(p); G.camKick += 1.5 * p; if (p > 0.85) G.shake = Math.max(G.shake, 0.012); }
+  // winding up slows the world: focus. The paddle keeps real time, everything else dilates. The
+  // last moments before contact slow as well, by what the level allows.
   const focusT = paddle.charging ? 1 - 0.32 * paddle.charge : 1;
   G.focus += (focusT - G.focus) * (1 - Math.exp(-14 * dt));
-  const gdt = dt * G.focus * (LEVELS[G.level].slow || 1);
+  G.approach += (approachT - G.approach) * (1 - Math.exp(-12 * dt));
+  const gdt = dt * G.focus * G.approach * (L.slow || 1);
   G.gameTime += gdt;
   const gnow = G.gameTime;
   bot.update(gdt, ball, match, gnow, paddle.pos.x, G.events);
@@ -305,11 +344,42 @@ function update(dt, now, realDt) {
   G.audio.update(dt, { rally: match.rally, tension, live: G.ballLive, running: true });
 }
 
+/**
+ * How long a release made now should wait so the swing peaks on the ball: the ball's time to the
+ * plane where the blade will be fastest, in real seconds under the slow-downs still to come,
+ * less the time the swing takes to reach its peak. Zero when no ball is coming or it is late.
+ */
+function timeToPeakReal(paddle, Vp) {
+  const L = LEVELS[G.level];
+  const { ball, match } = G;
+  if (!G.ballLive || match.state !== 'IN_PLAY' || match.lastHitter !== 1 || ball.v.z <= 0.5) return null;
+  const zPeak = paddle.pos.z - Vp * SWING.forwardT / Math.PI - BALL.R;
+  if (ball.p.z >= zPeak) return null;
+  const r = predict(ball, { maxT: 0.9, h: 1 / 300, until: (b, t, ev) => b.p.z >= zPeak || ev.some((x) => x.type === 'floor' || x.type === 'netin') });
+  if (!r.stop || r.state.p.z < zPeak - 0.02) return null;
+  const slow = L.slow || 1, n = 8, tg = r.t;
+  let real = 0;
+  for (let i = 0; i < n; i++) {
+    const tb = tg * (1 - (i + 0.5) / n);
+    const ap = L.approachSlow > 0 ? 1 - L.approachSlow * (1 - Math.min(1, tb / LEEWAY.approachT)) : 1;
+    const fo = 1 + (G.focus - 1) * Math.exp(-14 * real);
+    real += (tg / n) / (slow * ap * fo);
+  }
+  return real;
+}
+function swingHoldFor(paddle, Vp) {
+  const maxHold = LEVELS[G.level].swingHold || 0;
+  if (maxHold <= 0) return 0;
+  const real = timeToPeakReal(paddle, Vp);
+  return real === null ? 0 : clamp(real - SWING.forwardT / 2 - 0.02, 0, maxHold);   // trials read a 20 ms late bias
+}
+
 function updateTargetRing() {
   const ring = G.targetRing, { ball, paddle, match } = G;
-  const want = G.running && LEVELS[G.level].aim && G.ballLive && match.state === 'IN_PLAY' && match.lastHitter === 1 && ball.v.z > 0.5 && ball.p.z < paddle.zBase - 0.05;
+  const meetZ = paddle.meetZ();
+  const want = G.running && LEVELS[G.level].aim && G.ballLive && match.state === 'IN_PLAY' && match.lastHitter === 1 && ball.v.z > 0.5 && ball.p.z < meetZ - 0.05;
   if (!want) { ring.visible = false; return; }
-  const zp = paddle.zBase;
+  const zp = meetZ - BALL.R;                                     // the plane the ball will be met on
   const r = predict(ball, { maxT: 2, until: (b, t, ev) => b.p.z >= zp - 0.01 || ev.some((x) => x.type === 'floor' || x.type === 'netin' || (x.type === 'table' && x.side === 0 && ev.filter((y) => y.type === 'table' && y.side === 0).length >= 2)) });
   if (!r.stop || r.state.p.z < zp - 0.03) { ring.visible = false; return; }
   ring.visible = true;
@@ -344,6 +414,7 @@ function applyAssist(isServe) {
   const cfg = LEVELS[G.level];
   const b = G.ball;
   const halfL = TABLE.halfL, halfW = TABLE.halfW;
+  let wideSeen = false;
   // where a shot ends, as a sign: below zero it needs more height (net, own side, too close to
   // the net), above zero less (long, wide, the edge), zero when it lands well inside the lines
   const judge = (state) => {
@@ -366,10 +437,11 @@ function applyAssist(isServe) {
       if (land.side !== 1) return -1;                          // own side
     }
     if (land.z > -0.12) return -1;                             // too close to the net
-    if (land.z < -halfL + 0.14 || land.edge || Math.abs(land.x) > halfW - 0.06) return 1;
+    if (Math.abs(land.x) > halfW - 0.06) { wideSeen = true; return 1; }
+    if (land.z < -halfL + 0.14 || land.edge) return 1;
     return 0;
   };
-  const o0 = judge(b);
+  let o0 = judge(b);
   if (o0 === 0) return 'clean';
   const speed = b.v.length();
   if (speed < 0.8) return 'none';
@@ -378,18 +450,21 @@ function applyAssist(isServe) {
   // a slow ball carries no skill premium: below 7 m/s the lower levels may bend it further, and
   // push it a little harder, so a block met low becomes a lob instead of a pop-up
   const slow = !isServe && speed < 7 && cfg.assistAngle >= 0.15;
-  const A = isServe ? SERVE.assist : { angle: cfg.assistAngle, pace: cfg.assistPace, spin: cfg.assistSpin };
+  const A = isServe ? SERVE.assist : { angle: cfg.assistAngle, pace: cfg.assistPace, spin: cfg.assistSpin, yaw: cfg.assistYaw };
   const maxA = slow ? Math.max(A.angle, 0.55) : A.angle;
   // a dead block cannot reach the net from behind the end line under about 4.5 m/s, so the
   // lower levels may push a slow ball up to lob pace: the boost is a ceiling on the factor
-  const boost = slow ? Math.max(1.45, Math.min(cfg.assistBoost || 1.45, 5.2 / speed)) : 1;
-  // a slow ball met with the face down may be lifted to a lob whatever its angle as hit
+  const boost = slow ? Math.max(1.45, Math.min(cfg.assistBoost || 1.45, 5.6 / speed)) : 1;
+  // a slow ball met with the face down may be lifted to a lob whatever its angle as hit, and a
+  // ball popped up may be brought down to a drive: the window is relative to the shot as hit,
+  // these two are the absolute ends the lower levels may always reach
   const hiMax = slow ? Math.max(th0 + maxA, 0.62) : th0 + maxA;
+  const loMin = !isServe && cfg.assistAngle >= 0.15 ? Math.min(th0 - maxA, 0.04) : th0 - maxA;
   const spinMax = A.spin || 0, paceMin = A.pace || 0.95, paceMax = slow ? boost : (isServe ? 1.25 : 1);
   const topspinSign = b.v.z < 0 ? -1 : 1;                    // topspin for a ball travelling -z is negative x
-  const ux = b.v.x / hl, uz = b.v.z / hl;
+  let ux = b.v.x / hl, uz = b.v.z / hl;
   const trial = new BallState();
-  let budget = 100;
+  let budget = 120;
   const at = (th, s, dw) => {
     budget--;
     trial.copy(b);
@@ -409,12 +484,12 @@ function applyAssist(isServe) {
       if (o === 0) return 0;
       if (o < 0) return -1;
     } else {
-      hi = th0; lo = th0 - maxA;
+      hi = th0; lo = loMin;
       const o = at(lo, s, dw);
       if (o === 0) return 0;
       if (o > 0) return 1;
     }
-    while (hi - lo > 0.006 && budget > 0) {
+    while (hi - lo > 0.004 && budget > 0) {
       const mid = (lo + hi) / 2, o = at(mid, s, dw);
       if (o === 0) return 0;
       if (o < 0) lo = mid; else hi = mid;
@@ -422,34 +497,87 @@ function applyAssist(isServe) {
     return 1;                                                  // the window is thinner than the search: too fast
   };
   const commit = () => { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; };
-  const r = solve(speed, 0);
-  if (r === 0) return commit();
-  if (r > 0) {
-    // too fast: topspin brings it down before any pace comes off
-    for (const dw of [130, 260, 400]) {
-      if (dw > spinMax + 1e-6 || budget <= 0) break;
-      if (solve(speed, dw) === 0) return commit();
-    }
-    for (const sf of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52]) {
-      if (sf < paceMin - 1e-6 || budget <= 0) break;
-      const rr = solve(speed * sf, 0);
-      if (rr === 0) return commit();
-      if (rr < 0) break;                                       // now too slow: nothing lands between
-    }
-  } else {
-    for (const sf of [1.12, 1.25, 1.45, 1.7, 2.0, 2.4]) {
-      if (sf > paceMax + 1e-6 || budget <= 0) break;
-      const rr = solve(speed * sf, 0);
-      if (rr === 0) return commit();
-      if (rr > 0) break;
+  // wide as hit: turn toward the far centre first, by the least that brings the landing in
+  // (or by all the level allows), then search pace, spin and height from that direction
+  if (wideSeen && (A.yaw || 0) > 0) {
+    const ux0 = ux, uz0 = uz;
+    const cur = Math.atan2(ux0, uz0), want = Math.atan2(-b.p.x, -1.0 - b.p.z);
+    let delta = want - cur;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    const sgn = Math.sign(delta), lim = Math.min(Math.abs(delta), A.yaw);
+    for (const step of [0.04, 0.08, 0.12, 0.16, 0.2]) {
+      if (step > lim + 0.02 || budget <= 0) break;
+      const ya = sgn * Math.min(step, lim), c = Math.cos(ya), sn = Math.sin(ya);
+      ux = ux0 * c + uz0 * sn; uz = uz0 * c - ux0 * sn;
+      wideSeen = false;
+      o0 = at(th0, speed, 0);
+      if (o0 === 0) return commit();
+      if (!wideSeen) break;
     }
   }
-  // the fate is not always so tidy (a serve's two bounces): a coarse sweep with what is left
-  for (let d = 0.05; d <= maxA + 1e-6 && budget > 0; d += 0.05) {
-    if (th0 + d <= hiMax && at(th0 + d, speed, 0) === 0) return commit();
-    if (budget > 0 && at(th0 - d, speed, 0) === 0) return commit();
+  // the search proper: pace as hit, then spin, then pace, then a coarse sweep of the height
+  const run = () => {
+    const r = solve(speed, 0);
+    if (r === 0) return commit();
+    if (r > 0) {
+      // too fast: topspin first, then pace comes off (with topspin, then without): the fastest
+      // pace that lands, by bisection between the level's floor and the shot as hit
+      const ts = Math.min(spinMax, 320);
+      if (ts > 0 && solve(speed, ts) === 0) return commit();
+      if (spinMax >= 400 - 1e-6 && budget > 0 && solve(speed, 400) === 0) return commit();
+      const paceDown = (dw) => {
+        let lo = paceMin, hi = 1;
+        const rl = solve(speed * lo, dw);
+        if (rl === 0) return commit();
+        if (rl > 0) return null;                                 // even the floor is too fast
+        while (hi - lo > 0.05 && budget > 0) {
+          const mid = (lo + hi) / 2, rm = solve(speed * mid, dw);
+          if (rm === 0) return commit();
+          if (rm > 0) hi = mid; else lo = mid;
+        }
+        return null;
+      };
+      if (paceMin < 1 - 1e-6) {
+        if (ts > 0 && budget > 0) { const p = paceDown(ts); if (p) return p; }
+        if (budget > 0) { const p = paceDown(0); if (p) return p; }
+      }
+    } else {
+      for (const sf0 of [1.12, 1.25, 1.45, 1.7, 2.0, 2.4]) {
+        if (budget <= 0) break;
+        const sf = Math.min(sf0, paceMax);                     // the last rung is the boost ceiling itself
+        const rr = solve(speed * sf, 0);
+        if (rr === 0) return commit();
+        if (rr > 0 || sf0 >= paceMax) break;
+      }
+    }
+    // the fate is not always so tidy (a serve's two bounces): a coarse sweep with what is left
+    for (let d = 0.05; d <= maxA + 1e-6 && budget > 0; d += 0.05) {
+      if (th0 + d <= hiMax && at(th0 + d, speed, 0) === 0) return commit();
+      if (budget > 0 && at(th0 - d, speed, 0) === 0) return commit();
+    }
+    return 'none';
+  };
+  let res = run();
+  // a wide landing seen anywhere in that search: turn toward the far centre and search again
+  if (res === 'none' && wideSeen && (A.yaw || 0) > 0) {
+    const ux0 = ux, uz0 = uz;
+    const cur = Math.atan2(ux0, uz0), want = Math.atan2(-b.p.x, -1.0 - b.p.z);
+    let delta = want - cur;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    const sgn = Math.sign(delta), lim = Math.min(Math.abs(delta), A.yaw);
+    for (const frac of [0.5, 1]) {
+      const ya = sgn * lim * frac, c = Math.cos(ya), sn = Math.sin(ya);
+      ux = ux0 * c + uz0 * sn; uz = uz0 * c - ux0 * sn;
+      budget = frac < 1 ? 50 : 40; wideSeen = false;             // the whole assist stays under ~200 simulations
+      o0 = at(th0, speed, 0);
+      if (o0 === 0) return commit();
+      res = run();
+      if (res === 'assisted') return res;
+    }
   }
-  return 'none';
+  return res;
 }
 
 function handleEvent(e, now) {
@@ -459,6 +587,8 @@ function handleEvent(e, now) {
       const isPlayer = e.owner === 0;
       const res = match.onEvent(e, now);
       const timing = isPlayer ? paddle.timing() : { kind: e.quality || 'GOOD' };
+      const wasPending = isPlayer && paddle.pending;
+      if (wasPending) paddle.cancelSwing();
       let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
       if (isPlayer && e.edge) { G.hitLog.push({ q: 'EDGE', a: '-', serve: !!(res && res.serve !== undefined), speed: +G.ball.v.length().toFixed(1), rho: +e.rho.toFixed(2) }); if (G.hitLog.length > 40) G.hitLog.shift(); }
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
@@ -467,7 +597,9 @@ function handleEvent(e, now) {
         if (a === 'assisted' && q === 'PERFECT') q = 'GOOD';
         computeReachLater();
         const v = G.ball.v;
-        G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1) });
+        const sw = G.lastSwing && G.time - G.lastSwing.t < 1.5 ? G.lastSwing : null;
+        G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1),
+          swingT: +paddle.swingT.toFixed(3), phase: +timing.phase.toFixed(2), pend: wasPending, sinceSwing: sw ? +(G.time - sw.t).toFixed(3) : null, auto: sw ? sw.auto : null, hold: sw ? +(sw.hold || 0).toFixed(3) : null, tReal: sw ? +(sw.tReal || 0).toFixed(3) : null });
         if (G.hitLog.length > 40) G.hitLog.shift();
       }
       audio.paddle(e.speedIn + e.padSpeed * 0.5, { quality: q, edge: e.edge, slip: e.slip, brush: e.brush });
@@ -676,4 +808,4 @@ boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loadi
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
 import { solveShot } from './bots.js';
-window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist };
+window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };

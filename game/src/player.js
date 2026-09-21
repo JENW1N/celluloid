@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js';
 
-const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3();
+const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3(), _t2 = new THREE.Vector2();
 
 export class PlayerPaddle {
   constructor() {
@@ -25,19 +25,39 @@ export class PlayerPaddle {
     this.zBase = PLAYER.z0; this.reachZ = null;
     this.yaw = 0; this.pitch = 0; this.flip = 0; this.flipTarget = 0;
     this.wrist = 0.5; this.serving = false;
+    this.magnet = new THREE.Vector2();                     // the leeway drift, added to the target
+    this.pending = false; this.hold = 0; this.swingStarted = false;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); }
   nudge(dx, dy) { this.setTarget(this.target.x + dx, this.target.y + dy); }
   startCharge() { if (this.charging || this.swingT >= 0) return false; this.charging = true; this.charge = 0; return true; }
-  release(maxPower = 1) {
+  /** The blade speed a release at this charge would peak at. */
+  peakFor(charge, maxPower = 1) { return SWING.vTap + (SWING.vFull - SWING.vTap) * Math.min(maxPower, Math.max(0.12, charge)); }
+  /** Release the charge. With hold > 0 the blade stays cocked that long first, so the swing peaks on the ball. */
+  release(maxPower = 1, hold = 0) {
     if (!this.charging) return null;
     this.charging = false;
     this.swingPower = Math.min(maxPower, Math.max(0.12, this.charge));
     this.swingStart = SWING.back * easeOut(this.charge) * (this.serving ? 0.3 : 1);
-    this.swingPeak = SWING.vTap + (SWING.vFull - SWING.vTap) * this.swingPower;
-    this.swingT = 0; this.charge = 0;
+    this.swingPeak = this.peakFor(this.charge, maxPower);
+    this.charge = 0;
+    this.pending = hold > 0; this.hold = hold;
+    this.swingT = this.pending ? -1 : 0;
+    this.swingStarted = !this.pending;
     return this.swingPower;
   }
+  /**
+   * The plane the ball will be met on: while charging or waiting to swing, where the swing will
+   * be fastest (the cocked blade plus the travel to its peak); otherwise where the blade is.
+   */
+  meetZ() {
+    const Vp = this.charging ? this.peakFor(this.charge) : this.pending ? this.swingPeak : 0;
+    return this.pos.z - (Vp ? Vp * SWING.forwardT / Math.PI : 0);
+  }
+  /** True once, the frame a swing actually starts moving. */
+  takeSwingStart() { const s = this.swingStarted; this.swingStarted = false; return s; }
+  /** The ball got to the cocked blade before a waiting swing did: the swing is spent. */
+  cancelSwing() { this.pending = false; this.swingT = -1; }
   /** Where the swing is at time t after release: forward travel s, speed v, and its phase. */
   swingAt(t) {
     const Tf = SWING.forwardT, Tr = SWING.returnT, Vp = this.swingPeak;
@@ -55,12 +75,13 @@ export class PlayerPaddle {
   /** How far the wrist is cocked back, 0..1: the charge while charging, snapping forward after release. */
   cock() {
     if (this.charging) return this.charge;
+    if (this.pending) return this.swingPower;
     if (this.swingT >= 0 && this.swingT < 0.06) return this.swingPower * (1 - this.swingT / 0.06);
     return 0;
   }
   /** How well timed a contact right now is. */
   timing() {
-    if (this.swingT < 0) return { kind: 'BLOCK', phase: 0 };
+    if (this.pending || this.swingT < 0) return { kind: 'BLOCK', phase: 0 };
     const sw = this.swingAt(this.swingT);
     if (!sw.forward) return { kind: 'LATE', phase: 0 };
     const kind = sw.phase > 0.85 ? 'PERFECT' : sw.phase > 0.5 ? 'GOOD' : (this.swingT < SWING.forwardT / 2 ? 'EARLY' : 'LATE');
@@ -69,13 +90,18 @@ export class PlayerPaddle {
   update(dt, ball = null, serving = false) {
     this.serving = serving;
     const k = 1 - Math.exp(-28 * dt);
-    this.smooth.lerp(this.target, k);
+    _t2.copy(this.target).add(this.magnet);
+    this.smooth.lerp(_t2, k);
     const zT = this.reachZ == null ? PLAYER.z0 : clamp(this.reachZ, PLAYER.reachMin, PLAYER.reachMax);
     this.zBase += clamp(zT - this.zBase, -4.5 * dt, 4.5 * dt);
     let zOff = 0;
     if (this.charging) {
       this.charge = Math.min(1, this.charge + dt / SWING.chargeTime);
       zOff = SWING.back * easeOut(this.charge) * (serving ? 0.3 : 1);
+    }
+    if (this.pending) {
+      this.hold -= dt; zOff = this.swingStart;
+      if (this.hold <= 0) { this.pending = false; this.swingT = 0; this.swingStarted = true; }
     }
     if (this.swingT >= 0) {
       this.swingT += dt;

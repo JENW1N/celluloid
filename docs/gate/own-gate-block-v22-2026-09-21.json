@@ -1,0 +1,130 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T03:54:22.022Z",
+  "desktop": true,
+  "level": "novice",
+  "style": "block",
+  "ready_s": 2.628,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 25.58,
+  "contacts": 16,
+  "longest_rally": 8,
+  "points": 8,
+  "score": [
+    8,
+    0
+  ],
+  "samples": 1429,
+  "log": [
+    "YOU SERVE FAULT r0 1-0",
+    "YOU DOUBLE BOUNCE r7 2-0",
+    "YOU DOUBLE BOUNCE r8 3-0",
+    "YOU NET r1 4-0",
+    "YOU DOUBLE BOUNCE r1 5-0",
+    "YOU DOUBLE BOUNCE r3 6-0",
+    "YOU DOUBLE BOUNCE r2 7-0",
+    "YOU NET r1 8-0"
+  ],
+  "hits": [
+    "BLOCK/assisted@4.9",
+    "BLOCK/assisted@4.3",
+    "BLOCK/assisted@4.6",
+    "BLOCK/assisted@4.5",
+    "S:GOOD/assisted@5",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.6",
+    "BLOCK/assisted@4.3",
+    "BLOCK/assisted@4.4",
+    "S:GOOD/assisted@4.6",
+    "BLOCK/assisted@4.8",
+    "BLOCK/assisted@4.9",
+    "BLOCK/assisted@5",
+    "S:GOOD/assisted@4.7",
+    "BLOCK/assisted@4.5",
+    "S:GOOD/assisted@4.4"
+  ],
+  "final": {
+    "pos": [
+      -0.0007599526326947365,
+      0.9230934026717575
+    ],
+    "fps": 240,
+    "speed": 0.06014494112129185,
+    "score": [
+      8,
+      0
+    ],
+    "over": false,
+    "draws": 222,
+    "tris": 134248,
+    "rally": 0,
+    "hits": 16,
+    "state": "PLAY",
+    "ball": [
+      -0.3664149633888851,
+      0.7801978738561867,
+      -0.0008176215983291614
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        650.0062489191507,
+        592.0000681289339
+      ],
+      "pxPerM": [
+        414.6071261198608,
+        -353.0360992799456
+      ]
+    },
+    "points": 8,
+    "ballv": [
+      -0.00743804244435707,
+      0.059679180601727985,
+      -0.0006963259193374099
+    ],
+    "spin": 0.37342093388898817,
+    "level": "novice",
+    "server": 1,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      0,
+      "NET",
+      1
+    ],
+    "lastHit": {
+      "q": "GOOD",
+      "a": "assisted",
+      "serve": true,
+      "before": 8.8,
+      "speed": 4.4,
+      "el": -0.132,
+      "spin": -307,
+      "z": 1.53,
+      "y": 1.16,
+      "pad": 5,
+      "swingT": 0.038,
+      "phase": 0.97,
+      "pend": false,
+      "sinceSwing": null,
+      "auto": null,
+      "hold": null,
+      "tReal": null
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.625,
+    10.095,
+    17.617,
+    25.111,
+    32.613,
+    40.119,
+    47.635,
+    55.113
+  ],
+  "fails": [],
+  "result": "PASS"
+}

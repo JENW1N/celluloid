@@ -20,9 +20,9 @@ you move wide, closes as you rise above the net so a high ball is slammed, and o
 the table so a low ball is lifted. What it does not do is hit the ball for you. Serve with `W` (or
 the TOSS button), place the toss with the arrow keys, and hit it yourself.
 
-Three opponents, an order of magnitude apart. ROOKIE blocks and pushes and misses. CLUB loops the
-corners. PRO takes the ball on the rise and puts it where you are not. First to 11, two clear, the
-CPU serves first.
+Four opponents, an order of magnitude apart. NOVICE feeds the ball back to the middle and misses
+plenty. ROOKIE blocks and pushes. CLUB loops the corners. PRO takes the ball on the rise and puts
+it where you are not. First to 11, two clear, the CPU serves first.
 
 ## The physics, because the pitch was "as if the rubber and the ball were real"
 
@@ -45,9 +45,16 @@ cannot pass through a face.
 - The bots plan with the same integrator (`predict()`), solving the launch elevation by bisection
   against drag and Magnus, then add their own error. Nothing about the ball is faked in flight.
 
-The one concession to being a game: at ROOKIE and CLUB a return that would miss by a little is bent
-into a legal one (a few degrees of elevation, a pace cut, the topspin a real stroke would have
-brushed on), and the paddle's effective radius is generous. PRO gets almost none of that.
+The one concession to being a game is leeway, and it is what separates the levels more than the
+opponents do. Below PRO, a stroke that is nearly right is met halfway: as the ball closes, the
+paddle drifts a little toward where the ball will cross the plane the swing will meet it on; a
+button released early waits so the swing peaks on the ball, and at NOVICE and ROOKIE a charge
+still held as the ball arrives fires itself; the last third of a second before contact runs a
+little slower; and a return that would miss by a little is bent into a legal one (a few degrees of
+elevation, a turn toward the table, a pace cut, the topspin a real stroke would have brushed on).
+Every number is in `LEVELS` in `game/src/consts.js`, and `tools/leeway.mjs` proves each piece in
+headless Chrome: at NOVICE a paddle parked 28 cm off the ball still blocks it, an early release
+still hits at the peak, and at PRO the same strokes miss. PRO gets none of it.
 
 ## How it was made
 
