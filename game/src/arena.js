@@ -4,10 +4,10 @@
  * arena is a few dozen draw calls. The crowd bobs with excitement and jumps on a point.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609212151';
-import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js?v=202609212151';
-import { FlipBoard } from './flipboard.js?v=202609212151';
-import { TABLE, PALETTE, clamp } from './consts.js?v=202609212151';
+import { ASSET } from '../assetlib.js?v=202609212236';
+import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js?v=202609212236';
+import { FlipBoard } from './flipboard.js?v=202609212236';
+import { TABLE, PALETTE, clamp } from './consts.js?v=202609212236';
 
 export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'flip_scoreboard', 'ball_bucket', 'towel_box'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);
@@ -198,14 +198,15 @@ export async function buildArena(scene, { phone = false } = {}) {
   const barrier = await ASSET('./assets/barrier.js');
   const bT = [];
   for (const sx of [-1, 1]) for (let i = 0; i < 5; i++) bT.push(placement(sx * 3.7, 0, -4.66 + i * 2.33, sx > 0 ? -Math.PI / 2 : Math.PI / 2));
-  for (let i = -1; i <= 1; i++) bT.push(placement(i * 2.35, 0, -6.2, 0));
+  for (let i = -1; i <= 1; i++) { bT.push(placement(i * 2.35, 0, -6.2, 0)); bT.push(placement(i * 2.35, 0, 6.2, Math.PI)); }
   instanceAsset(scene, barrier, bT, { outline: 0.004 });
 
   // grandstands and the crowd
   const bleacher = await ASSET('./assets/bleacher_block.js');
   const blocks = [];
   for (const z of [-4.6, 0, 4.6]) { blocks.push(placement(7.8, 0, z, -Math.PI / 2)); blocks.push(placement(-7.8, 0, z, Math.PI / 2)); }
-  for (const x of [-4.6, 0, 4.6]) blocks.push(placement(x, 0, -8.6, 0));
+  // both ends have a stand: the camera never turns round in play, but a cut may
+  for (const x of [-4.6, 0, 4.6]) { blocks.push(placement(x, 0, -8.6, 0)); blocks.push(placement(x, 0, 8.6, Math.PI)); }
   instanceAsset(scene, bleacher, blocks, { outline: 0, shadows: false });
   const spectator = await ASSET('./assets/spectator.js');
   const seats = [];
@@ -250,7 +251,7 @@ export async function buildArena(scene, { phone = false } = {}) {
   // walls and light trusses
   const wall = await ASSET('./assets/arena_wall_section.js');
   const wT = [];
-  for (const x of [-8, 0, 8]) wT.push(placement(x, 0, -12.5, 0));
+  for (const x of [-8, 0, 8]) { wT.push(placement(x, 0, -12.5, 0)); wT.push(placement(x, 0, 12.5, Math.PI)); }
   for (const z of [-8, 0, 8]) { wT.push(placement(12.2, 0, z, -Math.PI / 2)); wT.push(placement(-12.2, 0, z, Math.PI / 2)); }
   const wallParts = instanceAsset(scene, wall, wT, { outline: 0, shadows: false });
   for (const part of wallParts) {
