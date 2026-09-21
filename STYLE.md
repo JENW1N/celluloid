@@ -1,4 +1,4 @@
-# CELLULOID — the locked style
+# PONG PING — the locked style
 
 > Chunky cel-shaded sports gear: every object is built from clean Three.js primitives with slightly
 > rounded, slightly oversized proportions, flat saturated colours that will be rendered in two-step

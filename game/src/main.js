@@ -1,23 +1,23 @@
 /**
- * CELLULOID. Boot, the frame, and the glue between physics events and everything that reacts
+ * PONG PING. Boot, the frame, and the glue between physics events and everything that reacts
  * to them: rules, sound, effects, the crowd, the camera, the interface, and the bots.
  *
  * The __GAME__ contract at the bottom is what the jam gate reads: pos is the paddle in metres,
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609212123';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609212123';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609212123';
-import { PlayerPaddle } from './player.js?v=202609212123';
-import { Input } from './input.js?v=202609212123';
-import { Match } from './rules.js?v=202609212123';
-import { Bot } from './bots.js?v=202609212123';
-import { AudioEngine } from './audio.js?v=202609212123';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609212123';
-import { NetCloth } from './netcloth.js?v=202609212123';
-import { buildArena, ASSET_LIST } from './arena.js?v=202609212123';
-import { UI } from './ui.js?v=202609212123';
+import { preloadAssets } from '../assetlib.js?v=202609212151';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609212151';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609212151';
+import { PlayerPaddle } from './player.js?v=202609212151';
+import { Input } from './input.js?v=202609212151';
+import { Match } from './rules.js?v=202609212151';
+import { Bot } from './bots.js?v=202609212151';
+import { AudioEngine } from './audio.js?v=202609212151';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609212151';
+import { NetCloth } from './netcloth.js?v=202609212151';
+import { buildArena, ASSET_LIST } from './arena.js?v=202609212151';
+import { UI } from './ui.js?v=202609212151';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -326,7 +326,7 @@ function update(dt, now, realDt) {
   const focusT = paddle.charging ? 1 - 0.32 * paddle.charge : 1;
   G.focus += (focusT - G.focus) * (1 - Math.exp(-14 * dt));
   G.approach += (approachT - G.approach) * (1 - Math.exp(-12 * dt));
-  const gdt = dt * G.focus * G.approach * (L.slow || 1);
+  const gdt = dt * G.focus * G.approach * (L.slow || 1) * (G.timeScale || 1);
   G.gameTime += gdt;
   const gnow = G.gameTime;
   if (G.botPending) { const pe = G.botPending; G.botPending = null; bot.onBallEvent(pe, ball, match, gnow); }
@@ -368,8 +368,8 @@ function update(dt, now, realDt) {
   G.ui.focus(ch);
   const showBall = G.ballLive || G.holdingBall || match.state === 'SERVE_WAIT';
   G.ballVis.update(gdt, ball, now, showBall, TABLE.H);
-  G.fx.update(dt);
-  G.confetti.update(dt);
+  G.fx.update(dt * (G.timeScale || 1));
+  G.confetti.update(dt * (G.timeScale || 1));
   G.cloth.update(gdt);
   const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
   G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
@@ -880,8 +880,8 @@ function telemetry() {
   if (G.ui.e.perf.classList.contains('on')) G.ui.perf(`${fpsShow} fps · ${r.calls} draws · ${(r.triangles / 1000).toFixed(0)}k tris`);
 }
 
-boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
+boot().catch((err) => { console.warn('[pong ping] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609212123';
+import { solveShot } from './bots.js?v=202609212151';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };

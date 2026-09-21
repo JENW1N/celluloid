@@ -1,4 +1,4 @@
-# CELLULOID
+# PONG PING
 
 Cel-shaded table tennis for the [404 game jam 001](https://github.com/404-Repo/404-game-jam), built
 with the [404 game recipe](https://github.com/404-Repo/404-game-recipe): every 3D object in it is a
