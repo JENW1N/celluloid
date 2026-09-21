@@ -12,7 +12,7 @@
  * ball check on the table.
  */
 import * as THREE from 'three';
-import { TABLE, NET, BALL, FLOOR_Y, G, AIR, TABLE_PHYS, FLOOR_PHYS, RUBBER, clamp, lerp } from './consts.js?v=202609212113';
+import { TABLE, NET, BALL, FLOOR_Y, G, AIR, TABLE_PHYS, FLOOR_PHYS, RUBBER, clamp, lerp } from './consts.js?v=202609212123';
 
 const ZERO = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);

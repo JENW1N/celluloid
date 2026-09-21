@@ -8,8 +8,8 @@
  */
 import * as THREE from 'three';
 const _evB = [];                                   // lent to every flight the bot simulates
-import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js?v=202609212113';
-import { BallState, predict, countType } from './physics.js?v=202609212113';
+import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js?v=202609212123';
+import { BallState, predict, countType } from './physics.js?v=202609212123';
 
 const ZERO = new THREE.Vector3();
 const _b = new BallState(), _v = new THREE.Vector3(), _hand = new THREE.Vector3(), _tmp = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -95,14 +95,19 @@ export class Bot {
     let apex = after[0];
     for (const s of after) if (s.y > apex.y) apex = s;
     const cross = after.find((s) => s.z <= -PLAYER.z0);
+    // the same rule the player lives by: the blade's plane follows the apex but never comes
+    // past the reach line, so the ball is met where it crosses that plane, or not at all
+    const zMeet = clamp(apex.z, -PLAYER.z0, -PLAYER.reachMin);
+    const reach = after.find((s) => s.z <= zMeet);
     const lob = apex.y > TABLE.H + 0.95;
     let pick;
-    if (lob) pick = after.find((s) => s.t > apex.t && s.y <= TABLE.H + 0.6) || cross || after[after.length - 1];
+    if (lob) pick = after.find((s) => s.t > apex.t && s.y <= TABLE.H + 0.6 && s.z <= zMeet) || reach || cross || null;
     else {
       const tEarly = tb + (apex.t - tb) * (1 - cfg.early);
-      const early = after.find((s) => s.t >= tEarly) || apex;
-      pick = cross && cross.t < early.t ? cross : early;
+      const early = after.find((s) => s.t >= tEarly && s.z <= zMeet) || reach || null;
+      pick = early && cross && cross.t < early.t ? cross : early;
     }
+    if (!pick) { this.plan = null; return; }                      // it never comes to the blade: a short ball is the player's point
     const P = new THREE.Vector3(pick.x, pick.y, pick.z);
     const tc = pick.t;
     const dist = P.distanceTo(this.pos);
@@ -171,7 +176,7 @@ export class Bot {
     // the swing: a lunge along the shot, then back
     if (this.swing >= 0) {
       this.swing += dt;
-      const T1 = 0.09, T2 = 0.32, amp = 0.16 + 0.22 * this.swingPower;
+      const T1 = 0.09, T2 = 0.32, amp = 0.1 + 0.12 * this.swingPower;   // a short lunge: the blade stays on its own half
       if (this.swing < T1) this.swingOff = amp * Math.sin(Math.PI * this.swing / T1 / 2);
       else if (this.swing < T1 + T2) { const u = (this.swing - T1) / T2; this.swingOff = amp * (1 - u * u * (3 - 2 * u)); }
       else { this.swing = -1; this.swingOff = 0; }

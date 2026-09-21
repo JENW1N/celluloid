@@ -1,0 +1,145 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T21:22:49.305Z",
+  "desktop": true,
+  "level": "club",
+  "style": "block",
+  "ready_s": 2.405,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 27.62,
+  "contacts": 21,
+  "longest_rally": 3,
+  "points": 13,
+  "score": [
+    4,
+    9
+  ],
+  "samples": 1566,
+  "log": [
+    "CPU LONG r3 0-1",
+    "CPU OWN SIDE r1 0-2",
+    "CPU LONG r2 0-3",
+    "YOU NET r1 1-3",
+    "CPU DOUBLE BOUNCE r0 1-4",
+    "CPU LONG r3 1-5",
+    "CPU LONG r2 1-6",
+    "YOU LONG r1 2-6",
+    "CPU OWN SIDE r1 2-7",
+    "CPU LONG r3 2-8",
+    "YOU NET r1 3-8",
+    "CPU LONG r2 3-9",
+    "YOU WINNER r3 4-9"
+  ],
+  "hits": [
+    "BLOCK/assisted@4.8",
+    "THIN/none@25(in25 el0.115 z1.56 y0.96)",
+    "THIN/none@4.9(in4.9 el1.362 z1.34 y0.8)",
+    "S:GOOD/assisted@3.8",
+    "BLOCK/none@9.8(in9.8 el0.451 z1.59 y0.91)",
+    "S:GOOD/assisted@3.7",
+    "S:GOOD/assisted@3.7",
+    "BLOCK/assisted@4.7",
+    "THIN/none@22.9(in22.9 el-0.097 z1.56 y0.88)",
+    "S:GOOD/assisted@3.8",
+    "BLOCK/none@9.4(in9.4 el0.328 z1.58 y0.94)",
+    "S:GOOD/assisted@3.7",
+    "S:GOOD/assisted@3.7",
+    "BLOCK/none@3.8(in3.8 el1.041 z1.59 y0.77)",
+    "BLOCK/assisted@4.8",
+    "THIN/none@34.5(in34.5 el0.061 z1.59 y0.91)",
+    "S:GOOD/assisted@3.7",
+    "S:GOOD/assisted@3.7",
+    "BLOCK/none@6.1(in6.1 el0.53 z1.58 y0.96)",
+    "BLOCK/assisted@4.6",
+    "THIN/assisted@29.8"
+  ],
+  "final": {
+    "pos": [
+      -0.0006965092310174837,
+      0.9202152906497816
+    ],
+    "fps": 240,
+    "speed": 0,
+    "score": [
+      4,
+      9
+    ],
+    "over": false,
+    "draws": 211,
+    "tris": 138104,
+    "rally": 0,
+    "hits": 21,
+    "state": "PLAY",
+    "ball": [
+      -0.7561262067363801,
+      0.17224087357820056,
+      -8.007467519406024
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        639.9390724148149,
+        592.9919010468464
+      ],
+      "pxPerM": [
+        414.21438018406093,
+        -352.6018540586324
+      ]
+    },
+    "points": 13,
+    "ballv": [
+      -1.3172122053844881,
+      -1.0706174226228178,
+      -13.305175485151324
+    ],
+    "spin": 1194.1759667702506,
+    "level": "club",
+    "server": 1,
+    "match": "POINT_OVER",
+    "live": false,
+    "last": [
+      0,
+      "WINNER",
+      3
+    ],
+    "lastHit": {
+      "q": "THIN",
+      "a": "assisted",
+      "serve": false,
+      "before": 29.8,
+      "speed": 29.8,
+      "el": 0.145,
+      "spin": -1787,
+      "wy": -70,
+      "wz": 209,
+      "spin0": -1387,
+      "wy0": -70,
+      "z": 1.59,
+      "y": 0.88,
+      "pad": 1.2,
+      "swingT": -1,
+      "phase": 0,
+      "pend": false,
+      "sinceSwing": null,
+      "auto": null,
+      "hold": null,
+      "tReal": null
+    },
+    "slow": []
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.602,
+    10.12,
+    17.6,
+    25.102,
+    32.613,
+    40.094,
+    47.607,
+    55.113
+  ],
+  "fails": [],
+  "result": "PASS"
+}

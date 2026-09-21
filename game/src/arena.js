@@ -4,10 +4,10 @@
  * arena is a few dozen draw calls. The crowd bobs with excitement and jumps on a point.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609212113';
-import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js?v=202609212113';
-import { FlipBoard } from './flipboard.js?v=202609212113';
-import { TABLE, PALETTE, clamp } from './consts.js?v=202609212113';
+import { ASSET } from '../assetlib.js?v=202609212123';
+import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js?v=202609212123';
+import { FlipBoard } from './flipboard.js?v=202609212123';
+import { TABLE, PALETTE, clamp } from './consts.js?v=202609212123';
 
 export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'flip_scoreboard', 'ball_bucket', 'towel_box'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);
