@@ -26,6 +26,9 @@ export class PlayerPaddle {
     this.yaw = 0; this.pitch = 0; this.flip = 0; this.flipTarget = 0;
     this.wrist = 0.5; this.serving = false;
     this.magnet = new THREE.Vector2();                     // the leeway drift, added to the target
+    this.brush = new THREE.Vector3();                      // the flick memory: the cursor's best recent motion, held then let go
+    this.brushGain = PLAYER.brushGain;
+    this.targetPrev = this.target.clone(); this.rawVel = new THREE.Vector3();
     this.pending = false; this.hold = 0; this.swingStarted = false;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); }
@@ -111,6 +114,12 @@ export class PlayerPaddle {
     this.posPrev.copy(this.pos);
     this.pos.set(this.smooth.x, this.smooth.y, this.zBase + zOff);
     this.vel.copy(this.pos).sub(this.posPrev).divideScalar(Math.max(dt, 1e-4));
+    // the flick memory follows the cursor itself (not the drift or the swing): a flick is kept at
+    // its peak and fades over flickMemory seconds, so the brush at contact is the flick you made
+    this.rawVel.set((this.target.x - this.targetPrev.x) / Math.max(dt, 1e-4), (this.target.y - this.targetPrev.y) / Math.max(dt, 1e-4), 0);
+    this.targetPrev.copy(this.target);
+    if (this.rawVel.lengthSq() >= this.brush.lengthSq()) this.brush.copy(this.rawVel);
+    else this.brush.multiplyScalar(Math.exp(-dt / PLAYER.flickMemory));
     // the wrist: aim at the far side, close when high, open when low
     const yawT = -Math.atan2(this.pos.x, this.pos.z - TILT.aimZ);
     const dy = this.pos.y - TILT.yRef;

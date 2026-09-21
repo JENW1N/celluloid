@@ -82,7 +82,9 @@ export class NetCloth {
       for (let i = 0; i < this.n; i++) {
         const dx = base[i * 3] - x, dy = base[i * 3 + 1] - y, d = Math.hypot(dx, dy);
         if (d > r) continue;
-        const want = dir * (depth + 0.02) * (1 - (d / r) * (d / r));
+        // the pocket sits a little beyond the ball's far face, so the ball and its outline are
+        // always seen through the mesh, never poking out of it
+        const want = dir * (depth + 0.036) * (1 - (d / r) * (d / r));
         if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.0012; }
       }
       this.tv += dir * depth * 3 * h * 30;

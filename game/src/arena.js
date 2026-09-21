@@ -50,17 +50,15 @@ function makeRubberTexture() {
   // 0.071 x 0.0735 topsheet onto the canvas
   const S = 256, c = document.createElement('canvas'); c.width = S; c.height = S;
   const x = c.getContext('2d');
-  const rim = x.createRadialGradient(S * 0.5, S * 0.5, S * 0.1, S * 0.5, S * 0.5, S * 0.52);
-  rim.addColorStop(0, '#f6f6f6'); rim.addColorStop(0.7, '#dcdcdc'); rim.addColorStop(1, '#8a8a8a');
-  x.fillStyle = rim; x.fillRect(0, 0, S, S);
+  x.fillStyle = '#e6e6e6'; x.fillRect(0, 0, S, S);
   const hi = x.createRadialGradient(S * 0.36, S * 0.3, 0, S * 0.36, S * 0.3, S * 0.36);
   hi.addColorStop(0, 'rgba(255,255,255,0.72)'); hi.addColorStop(0.45, 'rgba(255,255,255,0.22)'); hi.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = hi; x.fillRect(0, 0, S, S);
-  x.fillStyle = 'rgba(0,0,0,0.16)';
+  x.fillStyle = 'rgba(0,0,0,0.09)';
   for (let j = 3; j < S; j += 6) for (let i = 3 + ((j / 6) % 2) * 3; i < S; i += 6) { x.beginPath(); x.arc(i, j, 1.1, 0, Math.PI * 2); x.fill(); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1 / (2 * 0.0715), 1 / (2 * 0.075)); t.offset.set(0.5, 0.5);
+  t.repeat.set(1 / (2 * 0.075), 1 / (2 * 0.0785)); t.offset.set(0.5, 0.5);
   t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -133,14 +131,14 @@ function makeDome(scene) {
 }
 
 function setupLights(scene, phone) {
-  scene.fog = new THREE.Fog(0x0b0e1a, 9, 34);
+  scene.fog = new THREE.Fog(0x0b0e1a, 7, 30);
   // two warm pools on the table from the trusses
   for (const [x, z] of [[-2.2, -2.4], [2.2, 2.4]]) {
-    const sp = new THREE.SpotLight(0xffe2b8, 34, 16, Math.PI / 7, 0.6, 2);
+    const sp = new THREE.SpotLight(0xffe2b8, 40, 16, Math.PI / 8, 0.5, 2);
     sp.position.set(x, 6.3, z); sp.target.position.set(0, 0.76, 0);
     scene.add(sp); scene.add(sp.target);
   }
-  const key = new THREE.DirectionalLight(0xfff1dc, 1.45);
+  const key = new THREE.DirectionalLight(0xfff1dc, 0.6);
   key.position.set(2.6, 7.5, 3.2);
   key.target.position.set(0, 0.5, -0.4);
   scene.add(key); scene.add(key.target);
@@ -149,9 +147,9 @@ function setupLights(scene, phone) {
   const c = key.shadow.camera;
   c.left = -5.5; c.right = 5.5; c.top = 6; c.bottom = -6; c.near = 1; c.far = 22;
   key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
-  const hemi = new THREE.HemisphereLight(0x8fb4d8, 0x5a2a2a, 0.42);
+  const hemi = new THREE.HemisphereLight(0x8fb4d8, 0x5a2a2a, 0.16);
   scene.add(hemi);
-  const rim = new THREE.DirectionalLight(0x4fe3ff, 0.25);
+  const rim = new THREE.DirectionalLight(0x4fe3ff, 0.14);
   rim.position.set(-3, 3, -6);
   scene.add(rim);
   return { key, hemi, rim };
@@ -272,6 +270,10 @@ export async function buildArena(scene, { phone = false } = {}) {
   flipInst.position.set(2.3, TABLE.H + 0.001, 0.0); flipInst.rotation.y = -0.85; flipInst.scale.setScalar(0.92);
   scene.add(flipInst);
   out.flip = new FlipBoard(flipInst);
+  // a small lamp on the umpire's cards, so the score reads in the dark beyond the pools
+  const lamp = new THREE.SpotLight(0xfff4e0, 7, 6, Math.PI / 11, 0.75, 1.5);
+  lamp.position.set(2.85, 2.4, 0.95); lamp.target.position.copy(flipInst.position).add(new THREE.Vector3(0, 0.12, 0));
+  scene.add(lamp); scene.add(lamp.target);
   await setPiece('ball_bucket', 2.45, 0, -2.3, 0.4, 0.003);
   await setPiece('towel_box', 2.45, 0, 2.05, 0.2, 0.003);
   await setPiece('towel_box', -2.45, 0, -2.05, -0.3, 0.003);

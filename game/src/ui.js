@@ -46,18 +46,18 @@ export class UI {
   pulseSide(i) { const el = i === 0 ? this.e.s0 : this.e.s1; el.classList.remove('won'); void el.offsetWidth; el.classList.add('won'); }
   toast(text, kind = '', ms = 1300) {
     const t = this.e.toast;
-    t.textContent = text; t.className = `on ${kind}`;
+    t.innerHTML = `<span>${text}</span>`; t.className = `on ${kind}`;
     void t.offsetWidth; t.classList.add('anim');
     clearTimeout(this.toastT); this.toastT = setTimeout(() => { t.className = ''; }, ms);
   }
   quality(kind) {
     const q = this.e.quality;
-    q.textContent = kind; q.className = `on q-${kind.toLowerCase()}`;
+    q.innerHTML = `<span>${kind}</span>`; q.className = `on q-${kind.toLowerCase()}`;
     void q.offsetWidth; q.classList.add('anim');
     clearTimeout(this.qualT); this.qualT = setTimeout(() => { q.className = ''; }, 700);
   }
   rally(n) { this.e.rally.classList.toggle('on', n >= 4); this.e.rally.textContent = n >= 4 ? `${n}` : ''; this.e.rally.classList.toggle('hot', n >= 10); }
-  hint(text) { this.e.hint.textContent = text || ''; this.e.hint.classList.toggle('on', !!text); }
+  hint(text) { this.e.hint.innerHTML = text ? `<span>${text}</span>` : ''; this.e.hint.classList.toggle('on', !!text); }
   gamePoint(who) { this.e.gp.classList.toggle('on', who >= 0); this.e.gp.textContent = who === 0 ? 'GAME POINT' : who === 1 ? 'GAME POINT · CPU' : ''; this.e.vig.classList.toggle('on', who >= 0); }
   charge(level, charging) {
     this.e.charge.classList.toggle('on', charging);

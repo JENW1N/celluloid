@@ -20,7 +20,7 @@ export const FLOOR_PHYS = { e: 0.55, mu: 0.4 };
 export const RUBBER = { e: 0.82, et: 0.25, mu: 0.9 };
 export const PADDLE = { rx: 0.075, ry: 0.0785, r: 0.077, thick: 0.013, centerY: 0.1875 };
 
-export const PLAYER = { z0: 1.62, xMax: 1.1, yMin: 0.42, yMax: 2.1, yNeutral: 0.92, reachMin: 0.55, reachMax: 2.0 };
+export const PLAYER = { z0: 1.62, xMax: 1.1, yMin: 0.42, yMax: 2.1, yNeutral: 0.92, reachMin: 0.55, reachMax: 2.0, brushGain: 1.8, flickMemory: 0.12 };   // brushGain: flick to brush; flickMemory: seconds a flick is held
 export const SWING = { chargeTime: 0.55, back: 0.32, forwardT: 0.09, returnT: 0.26, vTap: 2.6, vFull: 10.5 };
 export const TILT = { aimZ: -0.9, yRef: 0.95, closeRate: 1.25, openRate: 1.4, maxClose: 0.75, maxOpen: 0.8, ready: 0.12 };   // ready: the face sits slightly open at rest
 export const SERVE = { handZ: 1.55, handY: 0.16, tossV: 2.2, xMax: 0.9, offsetMax: 0.35, power: 0.5, assist: { angle: 0.35, pace: 0.5, spin: 260, yaw: 0.12 } };   // a 20 cm toss; a serve is never a smash
@@ -41,15 +41,15 @@ export const PALETTE = {
  * miss, within magnetR, never more than magnetMax). swingHold: a release made early waits up to
  * this long so the swing peaks on the ball; autoSwing: a charge held too long fires by itself
  * as the ball arrives. approachSlow: the last approachT seconds before contact run slower.
- * assistYaw: the landing assist may turn a wide shot toward the table by this much. PRO has
- * none of it.
+ * assistYaw: the landing assist may turn a wide shot toward the table by this much. Every level
+ * has it, PRO the least: the levels differ by the opponent, not by whether you can hit the ball.
  */
 export const LEEWAY = { approachT: 0.35, magnetT: 0.4 };
 export const LEVELS = {
-  novice: { name: 'NOVICE', speed: 4.0, react: 0.2, sigma: 0.34, sigmaTheta: 0.06, spd: [4.3, 6.2], spin: [0, 50], smash: false, letsOut: 0, whiff: 0.2, place: 'center', early: 0, serveSpd: [4.0, 5.0], serveSpin: 0, assist: 1.9, assistAngle: 0.45, assistSpin: 420, assistPace: 0.3, assistBoost: 2.4, magnet: 0.85, magnetR: 0.32, magnetMax: 0.16, swingHold: 0.2, autoSwing: true, approachSlow: 0.25, assistYaw: 0.16, wrist: 0.75, slow: 0.8, aim: true },
-  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.3, sigmaTheta: 0.05, spd: [5.0, 7.5], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.14, place: 'center', early: 0, serveSpd: [4.6, 5.8], serveSpin: 0, assist: 1.75, assistAngle: 0.4, assistSpin: 420, assistPace: 0.4, assistBoost: 2.0, magnet: 0.75, magnetR: 0.28, magnetMax: 0.13, swingHold: 0.16, autoSwing: true, approachSlow: 0.2, assistYaw: 0.13, wrist: 0.65, slow: 0.86, aim: true },
-  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.45, assistAngle: 0.24, assistSpin: 260, assistPace: 0.7, assistBoost: 1.45, magnet: 0.5, magnetR: 0.2, magnetMax: 0.08, swingHold: 0.1, autoSwing: false, approachSlow: 0.12, assistYaw: 0.07, wrist: 0.45, slow: 0.94, aim: true },
-  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.2, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, assistBoost: 1.0, magnet: 0, magnetR: 0, magnetMax: 0, swingHold: 0, autoSwing: false, approachSlow: 0, assistYaw: 0, wrist: 0.3, slow: 1.0, aim: false },
+  novice: { name: 'NOVICE', speed: 4.0, react: 0.2, sigma: 0.34, sigmaTheta: 0.06, spd: [4.3, 6.2], spin: [0, 50], smash: false, letsOut: 0, whiff: 0.2, place: 'center', early: 0, serveSpd: [4.0, 4.8], serveSpin: 0, serveToPaddle: true, serveReach: 0.12, serveDepth: [0.65, 0.95], assist: 1.9, assistAngle: 0.45, assistSpin: 420, assistPace: 0.3, assistBoost: 2.4, magnet: 0.85, magnetR: 0.32, magnetMax: 0.16, swingHold: 0.2, autoSwing: true, approachSlow: 0.25, assistYaw: 0.16, wrist: 0.75, slow: 0.8, aim: true },
+  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.3, sigmaTheta: 0.05, spd: [5.0, 7.5], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.14, place: 'center', early: 0, serveSpd: [4.6, 5.8], serveSpin: 0, serveToPaddle: true, serveReach: 0.25, serveDepth: [0.62, 1.0], assist: 1.75, assistAngle: 0.4, assistSpin: 420, assistPace: 0.4, assistBoost: 2.0, magnet: 0.75, magnetR: 0.28, magnetMax: 0.13, swingHold: 0.16, autoSwing: true, approachSlow: 0.2, assistYaw: 0.13, wrist: 0.65, slow: 0.86, aim: true },
+  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 120, serveToPaddle: false, serveReach: 0.45, serveDepth: [0.62, 1.15], assist: 1.45, assistAngle: 0.4, assistSpin: 420, assistPace: 0.4, assistBoost: 2.0, magnet: 0.75, magnetR: 0.28, magnetMax: 0.13, swingHold: 0.16, autoSwing: true, approachSlow: 0.2, assistYaw: 0.13, wrist: 0.45, slow: 0.94, aim: true },
+  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 280, serveToPaddle: false, serveReach: 0.55, serveDepth: [0.62, 1.2], assist: 1.2, assistAngle: 0.32, assistSpin: 300, assistPace: 0.5, assistBoost: 1.6, magnet: 0.6, magnetR: 0.24, magnetMax: 0.1, swingHold: 0.12, autoSwing: true, approachSlow: 0.15, assistYaw: 0.1, wrist: 0.3, slow: 1.0, aim: true},
 };
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

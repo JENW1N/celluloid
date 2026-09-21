@@ -1,0 +1,5 @@
+=== 404 JAM VERDICT (local rerun, 2026-09-21T05:32:03.443Z) ===
+url          http://localhost:9000/__game__/game/
+ready_s      3.909
+errors       []
+result       PASS

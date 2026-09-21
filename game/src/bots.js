@@ -7,8 +7,9 @@
  * it smashes a high ball, and whether it takes the ball on the rise.
  */
 import * as THREE from 'three';
+const _evB = [];                                   // lent to every flight the bot simulates
 import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js';
-import { BallState, predict } from './physics.js';
+import { BallState, predict, countType } from './physics.js';
 
 const ZERO = new THREE.Vector3();
 const _b = new BallState(), _v = new THREE.Vector3(), _hand = new THREE.Vector3(), _tmp = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -28,7 +29,7 @@ export function solveShot(P, T, spd, w, side) {
   const err = (theta) => {
     const c = Math.cos(theta);
     _b.set(P, _v.set(spd * ux * c, spd * Math.sin(theta), spd * uz * c), w);
-    const r = predict(_b, { maxT: 2.5, until: (bb, t, ev) => decisive(ev) });
+    const r = predict(_b, { ev: _evB, maxT: 2.5, until: (bb, t, ev) => decisive(ev) });
     const e = decisive(r.events);
     if (!e) return 1;
     if (e.type === 'table') return e.side === side ? along(e.x, e.z) - hl : -0.9;
@@ -79,7 +80,7 @@ export class Bot {
     const bounced = match.bounces[1] === 1;
     const r = predict(ball, {
       maxT: 2.6, sample: true,
-      until: (b, t, ev) => b.p.z < -2.6 || ev.filter((x) => x.type === 'table').length >= (bounced ? 1 : 2) || ev.some((x) => x.type === 'netin' || x.type === 'floor'),
+      until: (b, t, ev) => b.p.z < -2.6 || countType(ev, 'table') >= (bounced ? 1 : 2) || ev.some((x) => x.type === 'netin' || x.type === 'floor'),
     });
     let tb = 0;
     if (!bounced) {
@@ -207,7 +208,9 @@ export class Bot {
     this.serveT += dt;
     if (this.servePhase !== 'toss' || this.serveT < 0.27) return;
     this.servePhase = 'hit';
+    const t0 = performance.now();
     const sol = this.solveServe(ball.p);
+    this.lastSolveMs = performance.now() - t0;
     const speedIn = ball.v.length();
     ball.set(ball.p, sol.v, sol.w);
     ev.push({ type: 'paddle', owner: 1, serve: true, speedIn, edge: false, slip: false, rho: 0.2, point: ball.p.clone(), normal: sol.v.clone().normalize(), padSpeed: sol.v.length() * 0.7, brush: 0, spin: sol.w.length(), speedOut: sol.v.length(), quality: 'GOOD', kind: 'serve' });
@@ -218,28 +221,41 @@ export class Bot {
     const cfg = this.cfg;
     const spinMag = cfg.serveSpin * rr(0.5, 1);
     const w = new THREE.Vector3(-spinMag * rr(0.3, 1), (Math.random() < 0.5 ? -1 : 1) * spinMag * rr(0, 0.8), 0);
-    const tx = rr(-0.45, 0.45), tz2 = rr(0.5, 1.15);
+    // where it should land on the player's side: the easy levels serve to the paddle, the hard
+    // ones anywhere; and how deep
+    const reach = cfg.serveReach === undefined ? 0.45 : cfg.serveReach;
+    const tx = clamp((cfg.serveToPaddle ? this.playerX : 0) + rr(-reach, reach), -0.55, 0.55);
+    const tz2 = cfg.serveDepth ? rr(cfg.serveDepth[0], cfg.serveDepth[1]) : rr(0.5, 1.15);
     const base = rr(cfg.serveSpd[0], cfg.serveSpd[1]);
     let best = null, fallback = null;
-    for (const z1 of [-1.1, -0.98, -0.86, -0.74, -0.62, -0.5, -0.4]) for (const f of [0.6, 0.72, 0.85, 1.0, 1.15, 1.32, 1.5, 1.7, 1.9]) {
-      const spd = base * f;
-      _d.set(tx * 0.5 - P.x, TABLE.H + BALL.R - P.y, z1 - P.z).normalize();
-      _b.set(P, _v.copy(_d).multiplyScalar(spd), w);
-      const r = predict(_b, { maxT: 2.5, until: (b, t, ev) => ev.filter((x) => x.type === 'table').length >= 2 || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'netclip') });
+    // a grid of first-bounce depths, aim heights and speeds; a clean two-bounce serve wins, and
+    // the nearest miss is kept so the bot always hits something
+    const judge = (v, w2) => {
+      _b.set(P, v, w2);
+      const r = predict(_b, { ev: _evB, maxT: 2.5, until: (b, t, ev) => countType(ev, 'table') >= 2 || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'netclip') });
       const tables = r.events.filter((e) => e.type === 'table');
-      if (!tables.length || tables[0].side !== 1) continue;
-      // bounced on our side at least: the nearest thing to a serve, kept in case nothing is clean
-      const far = tables[1] && tables[1].side === 0 ? Math.abs(tables[1].z - tz2) : 2;
-      if (!fallback || far < fallback.score) fallback = { score: far, v: _v.clone(), w: w.clone() };
-      if (tables.length < 2 || tables[1].side !== 0) continue;
-      if (r.events.some((e) => e.type === 'netclip')) continue;
-      const score = Math.abs(tables[1].z - tz2) + Math.abs(tables[1].x - tx) * 0.5;
-      if (!best || score < best.score) best = { score, v: _v.clone(), w: w.clone() };
-    }
+      if (!tables.length || tables[0].side !== 1) return null;
+      const far = tables[1] && tables[1].side === 0 ? Math.abs(tables[1].z - tz2) + Math.abs(tables[1].x - tx) * 0.5 : 2;
+      const clean = tables.length >= 2 && tables[1].side === 0 && !r.events.some((e) => e.type === 'netclip' || (e.type === 'nearmiss' && e.clearance < 0.012)) && Math.abs(tables[1].x) < TABLE.halfW - 0.08 && tables[1].z > 0.15 && tables[1].z < TABLE.halfL - 0.1;
+      return { far, clean };
+    };
+    const consider = (spd, z1, h, w2) => {
+      // the first bounce lies on the straight line from the hand to the landing spot
+      const x1 = P.x + (tx - P.x) * (z1 - P.z) / (tz2 - P.z);
+      _d.set(x1 - P.x, TABLE.H + BALL.R + h - P.y, z1 - P.z).normalize();
+      _v.copy(_d).multiplyScalar(spd);
+      const j = judge(_v, w2);
+      if (!j) return;
+      if (!fallback || j.far < fallback.score) fallback = { score: j.far, v: _v.clone(), w: w2.clone() };
+      if (j.clean && (!best || j.far < best.score)) best = { score: j.far, v: _v.clone(), w: w2.clone() };
+    };
+    for (const z1 of [-1.05, -0.9, -0.75, -0.6, -0.45]) for (const f of [0.65, 0.8, 1.0, 1.2, 1.45, 1.7, 1.95]) consider(base * f, z1, 0, w);
+    if (!best) for (const h of [0.05, 0.12, 0.2]) for (const z1 of [-1.05, -0.85, -0.65, -0.45]) for (const f of [0.7, 0.9, 1.1, 1.35, 1.6, 1.9]) consider(base * f, z1, h, w);
+    // still nothing: spin off, which a real server would also drop rather than fault
+    if (!best && w.lengthSq() > 0) for (const h of [0, 0.1, 0.2]) for (const z1 of [-1.0, -0.8, -0.6, -0.45]) for (const f of [0.7, 0.9, 1.1, 1.35, 1.6]) consider(base * f, z1, h, ZERO);
     if (best) return best;
     if (fallback) return fallback;
-    // nothing bounced on our side from here: a gentle push downward, a fault at worst
-    _d.set(0, -0.35, -1).normalize();
+    _d.set(0, -0.35, 1).normalize();
     return { score: 9, v: _d.clone().multiplyScalar(4.5), w: new THREE.Vector3() };
   }
 }

@@ -59,22 +59,31 @@ for (const t of trials) {
       hold = D.swingHoldFor(P, P.peakFor(P.charge));
       D.hooks.release();
     }
-    // track the live crossing the way a player tracks the ring, always the same distance off it
+    // track the live crossing the way a player tracks the ring, always the same distance off it;
+    // in flick mode the cursor snaps upward (or sideways) in the last tenth of a second, the way
+    // a player brushes for spin, and the spin the ball leaves with is the measure
+    let flickK = 0;
     while (G.hits === hits0 && G.ballLive && G.match.state === 'IN_PLAY' && Date.now() - t0 < 5000) {
       if (G.ball.v.z > 0.5 && G.ball.p.z < P.meetZ() - 0.05) {
         const zq = P.meetZ() - 0.02;
         const q = D.predict(G.ball, { maxT: 1.5, until: (b) => b.p.z >= zq });
-        if (q.stop) P.setTarget(q.state.p.x + off, q.state.p.y);
+        if (q.stop) {
+          let fx = 0, fy = 0;
+          if ((mode === 'flickup' || mode === 'flickside') && G.tCross !== null && G.tCross < 0.1) { flickK = Math.min(flickK + 1, 4); if (mode === 'flickup') fy = 0.022 * flickK; else fx = 0.022 * flickK; }
+          P.setTarget(q.state.p.x + off + fx, q.state.p.y + fy);
+        }
       }
       magMax = Math.max(magMax, P.magnet.length());
       await sleep(8);
     }
     const h = G.hitLog[G.hitLog.length - 1];
-    const res = G.hits > hits0 ? `HIT ${h.q}/${h.a}@${h.speed}${h.el !== undefined ? ` (in${h.before} el${h.el} z${h.z} y${h.y} pad${h.pad})` : ''}` : `MISS(${G.match.state})`;
+    const lp = G.match.lastPoint;
+    const res = G.hits > hits0 ? `HIT ${h.q}/${h.a}@${h.speed}${h.el !== undefined ? ` (in${h.before} el${h.el} z${h.z} y${h.y} pad${h.pad} spin ${h.spin},${h.wy},${h.wz})` : ''}`
+      : `MISS(${G.match.state}${lp ? ' ' + (lp.let ? 'LET' : lp.reason + ' to ' + lp.winner) : ''} ball z${G.ball.p.z.toFixed(2)} y${G.ball.p.y.toFixed(2)} vz${G.ball.v.z.toFixed(1)} tCross ${G.tCross === null ? 'null' : G.tCross.toFixed(2)} meet ${P.meetZ().toFixed(2)})`;
     const sw = G.hits > hits0 && h.swingT !== undefined ? ` swingT ${h.swingT} phase ${h.phase} pending ${h.pend} sinceSwing ${h.sinceSwing} auto ${h.auto} tReal ${h.tReal}` : '';
     P.charging = false; P.pending = false; P.swingT = -1;
     await until(() => G.match.state !== 'IN_PLAY', 6000);
-    return `${level.padEnd(6)} ${mode.padEnd(5)} off${off.toFixed(2)}  ${res.padEnd(28)} cross ${tc.toFixed(2)}s  magnet ${magMax.toFixed(3)} m  hold ${hold.toFixed(2)} s${sw}`;
+    return `${level.padEnd(6)} ${mode.padEnd(5)} off${off.toFixed(2)}  ${res.padEnd(28)} cross ${tc.toFixed(2)}s  magnet ${magMax.toFixed(3)} m  hold ${hold.toFixed(2)} s  serve:${G.lastBotServe}${sw}`;
   }, t);
   results.push(line);
   console.log(line);

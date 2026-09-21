@@ -1,7 +1,8 @@
 /**
- * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 6.5 mm, with a 3.5 mm wood lip
- * showing around the rubber; each face carries a sponge layer under its topsheet so the rim
- * reads as two layers: red on +Z, black on -Z, 13.5 mm in all. The grip is a flared profile
+ * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 6.5 mm; each face carries a
+ * sponge layer under its topsheet, red on +Z, black on -Z, and the rubber runs to the edge of
+ * the blade the way a fitted sheet does. An ink edge tape wraps the whole stack, 14.5 mm, so the
+ * rim is one clean band from any side. The grip is a flared profile
  * with darker scales on both faces, two wood wings where it meets the blade, and a rounded
  * butt. After recentring the butt is on the ground and the blade centre sits at
  * userData.blade.centerY above it, so a game can pivot about the blade.
@@ -17,17 +18,23 @@ export default function (THREE) {
   const redSponge = mat(0x8c1f26, 'fabric', 0.95);
   const black = mat(0x1a1a1f, 'fabric', 0.9);
   const blackSponge = mat(0x30303f, 'fabric', 0.95);
+  const tape = mat(0x141620, 'fabric', 0.8);
   const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); g.add(mesh); return mesh; };
 
-  const RX = 0.075, RY = 0.0785, HL = 0.08, T = 0.0065, LIP = 0.0035;
+  const RX = 0.075, RY = 0.0785, HL = 0.08, T = 0.0065, TAPE = 0.0012, STACK = T + 2 * 0.004;
   const ellipse = (rx, ry) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0); return s; };
   const slab = (rx, ry, depth) => new THREE.ExtrudeGeometry(ellipse(rx, ry), { depth, bevelEnabled: false, curveSegments: 32 });
 
   add(slab(RX, RY, T), ply, 0, 0, -T / 2);
-  add(slab(RX - LIP, RY - LIP, 0.0018), redSponge, 0, 0, T / 2);
-  add(slab(RX - LIP, RY - LIP, 0.0022), red, 0, 0, T / 2 + 0.0018);
-  add(slab(RX - LIP, RY - LIP, 0.0018), blackSponge, 0, 0, -T / 2 - 0.0018);
-  add(slab(RX - LIP, RY - LIP, 0.0022), black, 0, 0, -T / 2 - 0.004);
+  add(slab(RX, RY, 0.0018), redSponge, 0, 0, T / 2);
+  add(slab(RX, RY, 0.0022), red, 0, 0, T / 2 + 0.0018);
+  add(slab(RX, RY, 0.0018), blackSponge, 0, 0, -T / 2 - 0.0018);
+  add(slab(RX, RY, 0.0022), black, 0, 0, -T / 2 - 0.004);
+  // the edge tape: an elliptical band a hair proud of the rubber, over the whole stack
+  const band = ellipse(RX + TAPE, RY + TAPE);
+  const hole = new THREE.Path(); hole.absellipse(0, 0, RX - 0.0004, RY - 0.0004, 0, Math.PI * 2, true, 0);
+  band.holes.push(hole);
+  add(new THREE.ExtrudeGeometry(band, { depth: STACK, bevelEnabled: false, curveSegments: 40 }), tape, 0, 0, -STACK / 2);
 
   // the grip: a flared profile in the blade's plane, extruded through the thickness
   const top = -RY + 0.012, bottom = -RY - HL;
@@ -51,7 +58,7 @@ export default function (THREE) {
   butt.scale.set(1, 0.5, 0.65);
 
   const drop = 0.0165 * 0.5;
-  g.userData.blade = { rx: RX, ry: RY, centerY: RY + HL + drop, thickness: 0.0135, gripMidY: -RY - 0.046 };
+  g.userData.blade = { rx: RX, ry: RY, centerY: RY + HL + drop, thickness: STACK, gripMidY: -RY - 0.046 };
   for (const o of g.children) o.position.y += RY + HL + drop;
   return g;
 }

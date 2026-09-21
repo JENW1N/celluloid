@@ -45,16 +45,23 @@ cannot pass through a face.
 - The bots plan with the same integrator (`predict()`), solving the launch elevation by bisection
   against drag and Magnus, then add their own error. Nothing about the ball is faked in flight.
 
-The one concession to being a game is leeway, and it is what separates the levels more than the
-opponents do. Below PRO, a stroke that is nearly right is met halfway: as the ball closes, the
-paddle drifts a little toward where the ball will cross the plane the swing will meet it on; a
-button released early waits so the swing peaks on the ball, and at NOVICE and ROOKIE a charge
-still held as the ball arrives fires itself; the last third of a second before contact runs a
-little slower; and a return that would miss by a little is bent into a legal one (a few degrees of
-elevation, a turn toward the table, a pace cut, the topspin a real stroke would have brushed on).
-Every number is in `LEVELS` in `game/src/consts.js`, and `tools/leeway.mjs` proves each piece in
-headless Chrome: at NOVICE a paddle parked 28 cm off the ball still blocks it, an early release
-still hits at the peak, and at PRO the same strokes miss. PRO gets none of it.
+The one concession to being a game is leeway, and every level has it, PRO the least. A stroke
+that is nearly right is met halfway: as the ball closes, the paddle drifts a little toward where
+the ball will cross the plane the swing will meet it on; a button released early waits so the
+swing peaks on the ball, and a charge still held as the ball arrives fires itself; the last third
+of a second before contact runs a little slower; and a return that would miss by a little is
+bent into a legal one (a few degrees of elevation, a turn toward the table, a pace cut, the
+topspin a real stroke would have brushed on). The opponent's serve gets the same two-bounce
+assist, seen in the mirror, so a bot never faults. Spin does not need a frame-perfect flick: the
+paddle keeps the best flick of the last tenth of a second and brushes with it at contact, so a
+small upward, downward or sideways flick as the ball arrives is topspin, backspin or sidespin
+you can watch curve. Every number is in `LEVELS` in `game/src/consts.js`, and `tools/leeway.mjs`
+proves each piece in headless Chrome: a paddle parked 28 cm off the ball still blocks it, an
+early release still hits at the peak, a brush leaves the ball spinning at 100 to 200 rad/s, and
+thirteen CPU serves in a row are legal.
+
+A point is not a word on the screen: confetti in the arena's colours falls on the half that won
+it and settles on the table and the floor beside it.
 
 ## How it was made
 

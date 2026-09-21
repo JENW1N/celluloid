@@ -16,6 +16,7 @@ import { TABLE, NET, BALL, FLOOR_Y, G, AIR, TABLE_PHYS, FLOOR_PHYS, RUBBER, clam
 
 const ZERO = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
+const _vs = new THREE.Vector3(), _vb = new THREE.Vector3();
 const _a = new THREE.Vector3(), _t = new THREE.Vector3(), _n = new THREE.Vector3(), _vc = new THREE.Vector3();
 const _j = new THREE.Vector3(), _tmp = new THREE.Vector3(), _tmp2 = new THREE.Vector3();
 const _rel0 = new THREE.Vector3(), _rel1 = new THREE.Vector3(), _cp = new THREE.Vector3(), _off = new THREE.Vector3(), _nb = new THREE.Vector3();
@@ -68,6 +69,9 @@ export function airStep(b, h) {
  * Bounce off a surface whose unit normal n points from the surface toward the ball, moving at
  * surfaceV. Returns null if the ball is separating. Mutates b.v and b.w.
  */
+/** How many events of a type so far: the stop tests run every step, so no array is made. */
+export function countType(ev, type) { let n = 0; for (let i = 0; i < ev.length; i++) if (ev[i].type === type) n++; return n; }
+
 export function surfaceImpulse(b, n, surfaceV, e, et, mu) {
   _tmp.copy(b.v).sub(surfaceV);
   const vn = _tmp.dot(n);
@@ -209,7 +213,16 @@ export function collidePaddle(b, pad, ev, rnd, fa, fb) {
   if (edge) { _nb.x += (rnd() - 0.5) * 0.9; _nb.y += (rnd() - 0.5) * 0.9; _nb.z += (rnd() - 0.5) * 0.4; _nb.normalize(); }
   _tmp.copy(b.v).sub(pad.vel);
   if (_tmp.dot(_nb) >= -0.05) return false;
-  const r = surfaceImpulse(b, _nb, pad.vel, edge ? 0.45 : RUBBER.e, edge ? 0 : RUBBER.et, edge ? 0.3 : RUBBER.mu);
+  // the face meets the ball at the blade's honest speed along its normal; across the face, the
+  // brush is the paddle's flick memory (the best flick of the last tenth of a second, held), so
+  // spin does not need the flick and the contact to share one frame
+  let vs = pad.vel;
+  if (pad.brush) {
+    _vs.copy(_nb).multiplyScalar(pad.vel.dot(_nb));
+    _vb.copy(pad.brush).addScaledVector(_nb, -pad.brush.dot(_nb));
+    vs = _vs.addScaledVector(_vb, pad.brushGain || 1);
+  }
+  const r = surfaceImpulse(b, _nb, vs, edge ? 0.45 : RUBBER.e, edge ? 0 : RUBBER.et, edge ? 0.3 : RUBBER.mu);
   b.p.copy(_pB).add(_off).addScaledVector(_nb, R + 0.002);
   b.pPrev.copy(b.p);
   pad.cooldown = 0.05;
@@ -243,7 +256,8 @@ const _pb = new BallState();
  */
 export function predict(b0, opts = {}) {
   const b = _pb.copy(b0);
-  const ev = [];
+  const ev = opts.ev || [];
+  if (opts.ev) ev.length = 0;
   const h = opts.h || 1 / 300, maxT = opts.maxT || 3;
   const rnd = () => 0.5;
   const samples = opts.sample ? [] : null;

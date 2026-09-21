@@ -180,8 +180,10 @@ export class AudioEngine {
     const t = this.t, i = clamp(intensity, 0, 1);
     this.cheerLvl = Math.max(this.cheerLvl, i);
     this.noise(t, 1.6, 0.3 * i, { bp: 900, q: 0.5, attack: 0.25 });
+    // the claps are queued and made a few per frame: eighty nodes in one frame is a stutter
     const n = Math.floor(25 + 60 * i);
-    for (let k = 0; k < n; k++) this.noise(t + Math.random() * 1.8 * (0.6 + Math.random() * 0.4), 0.012, rr(0.04, 0.11) * i, { bp: 2500, q: 1.5, send: 0.4 });
+    if (!this.clapQueue) this.clapQueue = [];
+    for (let k = 0; k < n; k++) this.clapQueue.push({ t: t + Math.random() * 1.8 * (0.6 + Math.random() * 0.4), g: rr(0.04, 0.11) * i });
   }
   startAmbience() {
     const c = this.ctx, src = c.createBufferSource();
@@ -195,6 +197,9 @@ export class AudioEngine {
   }
   /** Per frame: the crowd level, the silence at game point, the rally pulse. */
   update(dt, ctx) {
+    if (this.clapQueue && this.clapQueue.length && this.ok()) {
+      for (let k = 0; k < 6 && this.clapQueue.length; k++) { const c = this.clapQueue.shift(); this.noise(Math.max(c.t, this.t), 0.012, c.g, { bp: 2500, q: 1.5, send: 0.4 }); }
+    }
     if (!this.ok()) return;
     const rallyLvl = clamp((ctx.rally - 2) / 10, 0, 1);
     let target = ctx.running ? 0.05 + 0.10 * rallyLvl + 0.08 * this.cheerLvl : 0.02;

@@ -1,0 +1,204 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T05:26:51.648Z",
+  "desktop": true,
+  "level": "novice",
+  "style": "charge",
+  "ready_s": 2.56,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 16.57,
+  "contacts": 13,
+  "longest_rally": 3,
+  "points": 9,
+  "score": [
+    6,
+    3
+  ],
+  "samples": 1358,
+  "log": [
+    "YOU WINNER r1 1-0",
+    "YOU WINNER r3 2-0",
+    "YOU WINNER r2 3-0",
+    "YOU WINNER r2 4-0",
+    "YOU WINNER r1 5-0",
+    "CPU ACE r0 5-1",
+    "YOU WINNER r2 6-1",
+    "CPU WINNER r1 6-2",
+    "CPU WINNER r2 6-3"
+  ],
+  "hits": [
+    "THIN/assisted@31.7",
+    "THIN/assisted@9.3",
+    "GOOD/assisted@21.5",
+    "S:GOOD/assisted@5.5",
+    "GOOD/assisted@20.9",
+    "S:GOOD/assisted@4.8",
+    "GOOD/assisted@22.7",
+    "GOOD/assisted@20.7",
+    "S:GOOD/assisted@4.8",
+    "THIN/assisted@32.2",
+    "S:GOOD/assisted@4.4",
+    "THIN/assisted@9.4",
+    "GOOD/assisted@6.5"
+  ],
+  "final": {
+    "pos": [
+      -0.0014367463712421965,
+      0.9211989034642021
+    ],
+    "fps": 220,
+    "speed": 4.712668949453467,
+    "score": [
+      6,
+      3
+    ],
+    "over": false,
+    "draws": 212,
+    "tris": 140904,
+    "rally": 1,
+    "hits": 13,
+    "state": "PLAY",
+    "ball": [
+      0.07038170400207505,
+      1.2558311537741547,
+      -0.4349034222702313
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        638.0847754863474,
+        592.9156075638264
+      ],
+      "pxPerM": [
+        414.32553739496484,
+        -352.6288950293724
+      ]
+    },
+    "points": 9,
+    "ballv": [
+      0.08776207974832098,
+      -1.5990283771716618,
+      -4.432229088562645
+    ],
+    "spin": 179.01256236776234,
+    "level": "novice",
+    "server": 1,
+    "match": "IN_PLAY",
+    "live": true,
+    "last": [
+      1,
+      "WINNER",
+      2
+    ],
+    "lastHit": {
+      "q": "GOOD",
+      "a": "assisted",
+      "serve": false,
+      "before": 21.7,
+      "speed": 6.5,
+      "el": 0.587,
+      "spin": -188,
+      "wy": 18,
+      "wz": 18,
+      "z": 1.56,
+      "y": 0.92,
+      "pad": 10.4,
+      "swingT": 0.05,
+      "phase": 0.99,
+      "pend": false,
+      "sinceSwing": 0.05,
+      "auto": false,
+      "hold": 0.003,
+      "tReal": 0
+    },
+    "slow": [
+      {
+        "t": 33.77,
+        "up": 10.1,
+        "rd": 3.1,
+        "as": 0,
+        "sv": 0,
+        "ev": "f"
+      },
+      {
+        "t": 50.59,
+        "up": 7.3,
+        "rd": 3.9,
+        "as": 0,
+        "sv": 0,
+        "ev": "f"
+      },
+      {
+        "t": 54.44,
+        "up": 12.3,
+        "rd": 3.4,
+        "as": 0,
+        "sv": 0,
+        "ev": ""
+      },
+      {
+        "t": 56.6,
+        "up": 6.3,
+        "rd": 10.5,
+        "as": 0,
+        "sv": 0,
+        "ev": ""
+      },
+      {
+        "t": 57.72,
+        "up": 0.6,
+        "rd": 12,
+        "as": 0,
+        "sv": 0,
+        "ev": ""
+      },
+      {
+        "t": 57.77,
+        "up": 1,
+        "rd": 10.4,
+        "as": 0,
+        "sv": 0,
+        "ev": ""
+      },
+      {
+        "t": 58.43,
+        "up": 8.8,
+        "rd": 2.9,
+        "as": 0,
+        "sv": 0,
+        "ev": "f"
+      },
+      {
+        "t": 59.73,
+        "up": 12.7,
+        "rd": 2.6,
+        "as": 0,
+        "sv": 0,
+        "ev": "fff"
+      },
+      {
+        "t": 59.91,
+        "up": 9.6,
+        "rd": 2.4,
+        "as": 0,
+        "sv": 0,
+        "ev": "ff"
+      }
+    ]
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.649,
+    10.118,
+    17.616,
+    25.092,
+    32.6,
+    40.138,
+    47.655,
+    55.135
+  ],
+  "fails": [],
+  "result": "PASS"
+}

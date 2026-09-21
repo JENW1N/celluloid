@@ -12,7 +12,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 let gradient = null;
 export function getGradient() {
   if (gradient) return gradient;
-  const steps = [0.34, 0.62, 1.0];
+  const steps = [0.24, 0.6, 1.0];                       // the unlit step is deep: beyond the pools the hall falls away
   const data = new Uint8Array(steps.length * 4);
   steps.forEach((s, i) => { const v = Math.round(s * 255); data[i * 4] = v; data[i * 4 + 1] = v; data[i * 4 + 2] = v; data[i * 4 + 3] = 255; });
   gradient = new THREE.DataTexture(data, steps.length, 1, THREE.RGBAFormat);

@@ -169,6 +169,77 @@ export class BallVisual {
   }
 }
 
+/**
+ * Confetti for a point: a handful of paper squares in the arena's colours tumble down over the
+ * half of the table the point was won on, settle on it and on the floor beside it, and shrink
+ * away. Instanced, unlit, flat: it is drawn like everything else here.
+ */
+export class Confetti {
+  constructor(scene) {
+    this.n = 140;
+    const geo = new THREE.PlaneGeometry(0.028, 0.02);
+    this.mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, toneMapped: false }), this.n);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 3; this.mesh.visible = false;
+    this.mesh.castShadow = false; this.mesh.receiveShadow = false;
+    this.p = []; this.v = []; this.rot = []; this.spin = []; this.t = new Float32Array(this.n); this.life = new Float32Array(this.n); this.floor = new Float32Array(this.n);
+    for (let i = 0; i < this.n; i++) { this.p.push(new THREE.Vector3()); this.v.push(new THREE.Vector3()); this.rot.push(new THREE.Euler()); this.spin.push(new THREE.Vector3()); this.t[i] = 9; this.life[i] = 1; }
+    this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._c = new THREE.Color();
+    this.mesh.setColorAt(0, new THREE.Color(0xffffff));    // the colour buffer exists before the shader compiles
+    scene.add(this.mesh);
+    this.live = 0;
+  }
+  /** side 0: the player's half (+z), 1: the far half. tableH: the table top. */
+  shower(side, tableH, big = false) {
+    const cols = [PALETTE.cyan, PALETTE.orange, 0xf2f2ee, 0xffd23f];
+    const zc = side === 0 ? 0.72 : -0.72;
+    const count = big ? this.n : 90;
+    let made = 0;
+    for (let i = 0; i < this.n && made < count; i++) {
+      if (this.t[i] < this.life[i]) continue;
+      made++;
+      const onTable = Math.random() < 0.75;
+      const x = onTable ? (Math.random() - 0.5) * 1.3 : (Math.random() < 0.5 ? -1 : 1) * (0.95 + Math.random() * 0.5);
+      const z = zc + (Math.random() - 0.5) * 1.1;
+      this.p[i].set(x, tableH + 0.55 + Math.random() * 0.5, z);
+      this.v[i].set((Math.random() - 0.5) * 0.6, -0.2 - Math.random() * 0.4, (Math.random() - 0.5) * 0.6);
+      this.rot[i].set(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28);
+      this.spin[i].set((Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 9);
+      this.floor[i] = onTable ? tableH + 0.004 : 0.004;
+      this.t[i] = 0; this.life[i] = 2.2 + Math.random() * 0.8;
+      this.mesh.setColorAt(i, this._c.setHex(cols[(Math.random() * cols.length) | 0]));
+    }
+    this.mesh.instanceColor.needsUpdate = true;
+    this.mesh.visible = true;
+  }
+  update(dt) {
+    if (!this.mesh.visible) return;
+    let any = false;
+    for (let i = 0; i < this.n; i++) {
+      if (this.t[i] >= this.life[i]) { this._s.set(0, 0, 0); this._m.compose(this.p[i], this._q.identity(), this._s); this.mesh.setMatrixAt(i, this._m); continue; }
+      any = true;
+      this.t[i] += dt;
+      const p = this.p[i], v = this.v[i];
+      if (p.y > this.floor[i]) {
+        // paper falls slowly and wanders: gravity against strong drag, a side-to-side flutter
+        v.y = Math.max(v.y - 9.81 * dt, -1.5);
+        v.x += (Math.sin(this.t[i] * 7 + i) * 0.9) * dt; v.z += (Math.cos(this.t[i] * 6 + i * 0.7) * 0.9) * dt;
+        v.x *= 1 - 1.5 * dt; v.z *= 1 - 1.5 * dt;
+        p.addScaledVector(v, dt);
+        this.rot[i].x += this.spin[i].x * dt; this.rot[i].y += this.spin[i].y * dt; this.rot[i].z += this.spin[i].z * dt;
+        if (p.y <= this.floor[i]) { p.y = this.floor[i]; this.rot[i].set(-Math.PI / 2 + (Math.random() - 0.5) * 0.3, 0, Math.random() * 6.28); v.set(0, 0, 0); }
+      }
+      const fade = Math.min(1, (this.life[i] - this.t[i]) / 0.5);          // shrinks away at the end
+      this._q.setFromEuler(this.rot[i]);
+      this._s.setScalar(Math.max(0.0001, fade));
+      this._m.compose(p, this._q, this._s);
+      this.mesh.setMatrixAt(i, this._m);
+    }
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (!any) this.mesh.visible = false;
+  }
+}
+
 export class Impacts {
   constructor(scene) {
     this.scene = scene;
