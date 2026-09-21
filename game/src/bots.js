@@ -8,8 +8,8 @@
  */
 import * as THREE from 'three';
 const _evB = [];                                   // lent to every flight the bot simulates
-import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js?v=202609211910';
-import { BallState, predict, countType } from './physics.js?v=202609211910';
+import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js?v=202609211927';
+import { BallState, predict, countType } from './physics.js?v=202609211927';
 
 const ZERO = new THREE.Vector3();
 const _b = new BallState(), _v = new THREE.Vector3(), _hand = new THREE.Vector3(), _tmp = new THREE.Vector3(), _d = new THREE.Vector3();

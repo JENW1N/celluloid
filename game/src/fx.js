@@ -8,7 +8,7 @@
  * sparks. Everything here is built from Three.js constructors; nothing is a file.
  */
 import * as THREE from 'three';
-import { BALL, PALETTE, clamp } from './consts.js?v=202609211910';
+import { BALL, PALETTE, clamp } from './consts.js?v=202609211927';
 
 const UP = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _col = new THREE.Color();
@@ -176,39 +176,44 @@ export class BallVisual {
  * away. Instanced, unlit, flat: it is drawn like everything else here.
  */
 /**
- * The paddle's contrail: two thin ribbons off the rim points across the blade's motion, like
- * wingtips, alive only while the blade moves across the plane (a lunge is the ghosts' job).
- * Paper white, additive, gone in a tenth of a second: evident, never loud.
+ * The paddle's echo: two faint ink outlines of the blade where it was 50 and 100 ms ago, the
+ * way a hand-drawn frame shows motion, shown only while the blade moves across its plane (a
+ * lunge is the ghosts' job) and fading with speed. No light, no streak: a line and then none.
  */
 export class PaddleTrail {
-  constructor(scene, rx = 0.075) {
-    this.rx = rx;
-    this.a = new Trail(scene, 24, 0.004, 0.006, 0.16);
-    this.b = new Trail(scene, 24, 0.004, 0.006, 0.16);
-    this.color = new THREE.Color(0xf2f2ee);
-    this.t = new THREE.Vector3(); this.tip = new THREE.Vector3(); this.inPlane = new THREE.Vector3();
-    this.cam = new THREE.Vector3();
-    this.strength = 0;
+  constructor(scene, rx = 0.075, ry = 0.0785) {
+    this.hist = [];                                        // { p, q, t }, newest first, time-spaced
+    this.rings = [];
+    for (const alpha of [0.3, 0.16]) {
+      const m = new THREE.Mesh(new THREE.TorusGeometry(1, 0.0016, 6, 56), new THREE.MeshBasicMaterial({ color: 0x0b0e1a, transparent: true, opacity: 0, depthWrite: false }));
+      m.scale.set(rx, ry, 1); m.renderOrder = 3; m.visible = false; m.frustumCulled = false;
+      scene.add(m);
+      this.rings.push({ m, alpha, ago: this.rings.length === 0 ? 0.05 : 0.1 });
+    }
+    this.inPlane = new THREE.Vector3(); this.strength = 0;
+    this._q = new THREE.Quaternion();
   }
-  clear() { this.a.clear(); this.b.clear(); this.strength = 0; }
-  /** pos: blade centre; normal: face normal; vel: blade velocity, all in world space. */
-  update(pos, normal, vel, now, camera, dt) {
-    // motion across the face only: the part of the velocity in the blade's plane
+  clear() { this.hist.length = 0; this.strength = 0; for (const r of this.rings) r.m.visible = false; }
+  /** pivot: the blade's visual pivot (position and orientation); normal, vel: the paddle's, in world space. */
+  update(pivot, normal, vel, now, camera, dt) {
     this.inPlane.copy(vel).addScaledVector(normal, -vel.dot(normal));
     const s = this.inPlane.length();
-    const want = Math.min(1, Math.max(0, (s - 0.7) / 3.0));
-    this.strength += (want - this.strength) * (1 - Math.exp(-18 * dt));
-    // the rim points across that motion as the camera sees them: on the blade's silhouette, so
-    // both ribbons show whatever the wrist has turned the face to
-    this.cam.copy(camera.position).sub(pos);
-    this.t.crossVectors(this.cam, this.inPlane);
-    if (this.t.lengthSq() < 1e-6) this.t.set(0, 1, 0);
-    this.t.normalize();
-    this.a.push(this.tip.copy(pos).addScaledVector(this.t, this.rx), now, s);
-    this.b.push(this.tip.copy(pos).addScaledVector(this.t, -this.rx), now, s);
-    const k = this.strength * 0.8;
-    this.a.update(now, camera, this.color, k);
-    this.b.update(now, camera, this.color, k);
+    const want = Math.min(1, Math.max(0, (s - 0.9) / 2.6));
+    this.strength += (want - this.strength) * (1 - Math.exp(-14 * dt));
+    const last = this.hist[0];
+    if (!last || now - last.t >= 0.012) {
+      this.hist.unshift({ p: pivot.position.clone(), q: pivot.quaternion.clone(), t: now });
+      while (this.hist.length > 16) this.hist.pop();
+    }
+    for (const r of this.rings) {
+      let pick = null;
+      for (const h of this.hist) { if (now - h.t >= r.ago) { pick = h; break; } }
+      const a = this.strength * r.alpha;
+      if (!pick || a < 0.02) { r.m.visible = false; continue; }
+      r.m.visible = true;
+      r.m.position.copy(pick.p); r.m.quaternion.copy(pick.q);
+      r.m.material.opacity = a;
+    }
   }
 }
 
