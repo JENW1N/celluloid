@@ -8,15 +8,15 @@
  * sparks. Everything here is built from Three.js constructors; nothing is a file.
  */
 import * as THREE from 'three';
-import { BALL, PALETTE, clamp } from './consts.js?v=202609211609';
+import { BALL, PALETTE, clamp } from './consts.js?v=202609211848';
 
 const UP = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _col = new THREE.Color();
 const TOP = new THREE.Color(PALETTE.orange), BACK = new THREE.Color(PALETTE.cyan), SIDE = new THREE.Color(0x9cff5a), NONE = new THREE.Color(0xffffff);
 
 class Trail {
-  constructor(scene, n = 22) {
-    this.n = n; this.pts = [];
+  constructor(scene, n = 22, w0 = 0.018, w1 = 0.03, life = 0.14) {
+    this.n = n; this.pts = []; this.w0 = w0; this.w1 = w1; this.life = life;
     const geo = new THREE.BufferGeometry();
     this.pos = new Float32Array(n * 2 * 3); this.colors = new Float32Array(n * 2 * 3);
     geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
@@ -31,13 +31,14 @@ class Trail {
   }
   push(p, t, speed) {
     const last = this.pts[0];
-    if (last && last.p.distanceToSquared(p) < 1e-6) return;
+    // samples are spaced in time, so the ribbon's length does not depend on the frame rate
+    if (last && (last.p.distanceToSquared(p) < 1e-6 || t - last.t < 0.007)) return;
     this.pts.unshift({ p: p.clone(), t, s: speed });
     while (this.pts.length > this.n) this.pts.pop();
   }
   clear() { this.pts.length = 0; this.mesh.visible = false; }
   update(now, camera, color, strength) {
-    while (this.pts.length && now - this.pts[this.pts.length - 1].t > 0.14) this.pts.pop();
+    while (this.pts.length && now - this.pts[this.pts.length - 1].t > this.life) this.pts.pop();
     const n = this.pts.length;
     if (n < 2 || strength <= 0.01) { this.mesh.visible = false; return; }
     this.mesh.visible = true;
@@ -50,7 +51,7 @@ class Trail {
       camDir.copy(camera.position).sub(pt.p);
       _b.crossVectors(_a, camDir).normalize();
       const fade = 1 - k / Math.max(1, n - 1);
-      const w = (0.018 + 0.03 * strength) * (0.25 + 0.75 * fade);
+      const w = (this.w0 + this.w1 * strength) * (0.25 + 0.75 * fade);
       const o = i * 6;
       this.pos[o] = pt.p.x + _b.x * w; this.pos[o + 1] = pt.p.y + _b.y * w; this.pos[o + 2] = pt.p.z + _b.z * w;
       this.pos[o + 3] = pt.p.x - _b.x * w; this.pos[o + 4] = pt.p.y - _b.y * w; this.pos[o + 5] = pt.p.z - _b.z * w;
@@ -174,6 +175,43 @@ export class BallVisual {
  * half of the table the point was won on, settle on it and on the floor beside it, and shrink
  * away. Instanced, unlit, flat: it is drawn like everything else here.
  */
+/**
+ * The paddle's contrail: two thin ribbons off the rim points across the blade's motion, like
+ * wingtips, alive only while the blade moves across the plane (a lunge is the ghosts' job).
+ * Paper white, additive, gone in a tenth of a second: evident, never loud.
+ */
+export class PaddleTrail {
+  constructor(scene, rx = 0.075) {
+    this.rx = rx;
+    this.a = new Trail(scene, 24, 0.004, 0.006, 0.16);
+    this.b = new Trail(scene, 24, 0.004, 0.006, 0.16);
+    this.color = new THREE.Color(0xf2f2ee);
+    this.t = new THREE.Vector3(); this.tip = new THREE.Vector3(); this.inPlane = new THREE.Vector3();
+    this.cam = new THREE.Vector3();
+    this.strength = 0;
+  }
+  clear() { this.a.clear(); this.b.clear(); this.strength = 0; }
+  /** pos: blade centre; normal: face normal; vel: blade velocity, all in world space. */
+  update(pos, normal, vel, now, camera, dt) {
+    // motion across the face only: the part of the velocity in the blade's plane
+    this.inPlane.copy(vel).addScaledVector(normal, -vel.dot(normal));
+    const s = this.inPlane.length();
+    const want = Math.min(1, Math.max(0, (s - 0.7) / 3.0));
+    this.strength += (want - this.strength) * (1 - Math.exp(-18 * dt));
+    // the rim points across that motion as the camera sees them: on the blade's silhouette, so
+    // both ribbons show whatever the wrist has turned the face to
+    this.cam.copy(camera.position).sub(pos);
+    this.t.crossVectors(this.cam, this.inPlane);
+    if (this.t.lengthSq() < 1e-6) this.t.set(0, 1, 0);
+    this.t.normalize();
+    this.a.push(this.tip.copy(pos).addScaledVector(this.t, this.rx), now, s);
+    this.b.push(this.tip.copy(pos).addScaledVector(this.t, -this.rx), now, s);
+    const k = this.strength * 0.8;
+    this.a.update(now, camera, this.color, k);
+    this.b.update(now, camera, this.color, k);
+  }
+}
+
 export class Confetti {
   constructor(scene) {
     this.n = 140;

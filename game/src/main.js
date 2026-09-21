@@ -6,18 +6,18 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609211609';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211609';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211609';
-import { PlayerPaddle } from './player.js?v=202609211609';
-import { Input } from './input.js?v=202609211609';
-import { Match } from './rules.js?v=202609211609';
-import { Bot } from './bots.js?v=202609211609';
-import { AudioEngine } from './audio.js?v=202609211609';
-import { BallVisual, Impacts, Confetti } from './fx.js?v=202609211609';
-import { NetCloth } from './netcloth.js?v=202609211609';
-import { buildArena, ASSET_LIST } from './arena.js?v=202609211609';
-import { UI } from './ui.js?v=202609211609';
+import { preloadAssets } from '../assetlib.js?v=202609211848';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211848';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211848';
+import { PlayerPaddle } from './player.js?v=202609211848';
+import { Input } from './input.js?v=202609211848';
+import { Match } from './rules.js?v=202609211848';
+import { Bot } from './bots.js?v=202609211848';
+import { AudioEngine } from './audio.js?v=202609211848';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609211848';
+import { NetCloth } from './netcloth.js?v=202609211848';
+import { buildArena, ASSET_LIST } from './arena.js?v=202609211848';
+import { UI } from './ui.js?v=202609211848';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -61,6 +61,7 @@ async function boot() {
   G.ballVis = new BallVisual(G.arena.ball, scene, camera);
   G.fx = new Impacts(scene);
   G.confetti = new Confetti(scene);
+  G.padTrail = new PaddleTrail(scene, PADDLE.rx);
   G.cloth = new NetCloth(G.arena.net);
   setupPaddleVisuals();
   // where the ball will cross your paddle plane: a faint ring to put the blade on
@@ -252,6 +253,7 @@ function idle(dt, now) {
   if (G.hasPointer && !G.input.touch) projectPointer();
   G.paddle.update(dt);
   updatePaddleVisual(0, G.paddle.pos, G.paddle.normal, -1, G.paddle.flip);
+  G.padTrail.update(G.paddle.pos, G.paddle.normal, G.paddle.vel, now, camera, dt);
   if (G.bot) updatePaddleVisual(1, G.bot.visualPos(_a), G.bot.normal, 1, G.bot.flip);
   else updatePaddleVisual(1, _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 1, 0);
   G.ballVis.update(dt, G.ball, now, true, TABLE.H);
@@ -351,6 +353,7 @@ function update(dt, now, realDt) {
   if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
   // visuals: the player sees the red side of their own blade; the wrist cocks while charging
   updatePaddleVisual(0, paddle.pos, paddle.normal, -1, paddle.flip, paddle.cock(), paddle.charge >= 0.999 && paddle.charging);
+  G.padTrail.update(paddle.pos, paddle.normal, paddle.vel, now, camera, dt);
   updatePaddleVisual(1, bot.visualPos(_a), bot.normal, 1, bot.flip);
   updateGhosts(paddle);
   const ch = paddle.charging ? paddle.charge : 0;
@@ -849,5 +852,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609211609';
+import { solveShot } from './bots.js?v=202609211848';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };

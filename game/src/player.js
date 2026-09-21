@@ -7,7 +7,7 @@
  * so a fast flick at contact is a brush, and a brush is spin.
  */
 import * as THREE from 'three';
-import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609211609';
+import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609211848';
 
 const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3(), _t2 = new THREE.Vector2();
 
