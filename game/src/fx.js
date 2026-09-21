@@ -8,7 +8,7 @@
  * sparks. Everything here is built from Three.js constructors; nothing is a file.
  */
 import * as THREE from 'three';
-import { BALL, PALETTE, clamp } from './consts.js';
+import { BALL, PALETTE, clamp } from './consts.js?v=202609211609';
 
 const UP = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _col = new THREE.Color();

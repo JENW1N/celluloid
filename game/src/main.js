@@ -6,18 +6,18 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js';
-import { BallState, stepWorld, predict, countType } from './physics.js';
-import { PlayerPaddle } from './player.js';
-import { Input } from './input.js';
-import { Match } from './rules.js';
-import { Bot } from './bots.js';
-import { AudioEngine } from './audio.js';
-import { BallVisual, Impacts, Confetti } from './fx.js';
-import { NetCloth } from './netcloth.js';
-import { buildArena, ASSET_LIST } from './arena.js';
-import { UI } from './ui.js';
+import { preloadAssets } from '../assetlib.js?v=202609211609';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211609';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211609';
+import { PlayerPaddle } from './player.js?v=202609211609';
+import { Input } from './input.js?v=202609211609';
+import { Match } from './rules.js?v=202609211609';
+import { Bot } from './bots.js?v=202609211609';
+import { AudioEngine } from './audio.js?v=202609211609';
+import { BallVisual, Impacts, Confetti } from './fx.js?v=202609211609';
+import { NetCloth } from './netcloth.js?v=202609211609';
+import { buildArena, ASSET_LIST } from './arena.js?v=202609211609';
+import { UI } from './ui.js?v=202609211609';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -849,5 +849,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js';
+import { solveShot } from './bots.js?v=202609211609';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };
