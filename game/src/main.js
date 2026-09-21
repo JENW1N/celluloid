@@ -437,7 +437,7 @@ function handleOutcome(res, now) {
     ui.pulseSide(res.point);
     audio.point(win, gp || !!res.gameOver);
     audio.cheer(win ? (gp ? 1 : 0.55) : 0.25);
-    arena.crowd.update(0, 0, win ? 1 : 0.35);
+    arena.crowd.update(0, 0, win ? 1 : 0.7);
     ui.flash(win ? 'rgba(79,227,255,0.22)' : 'rgba(255,122,48,0.12)');
     G.shake = Math.max(G.shake, win ? 0.02 : 0.008);
     G.lastPointT = now; G.reachZ = null;

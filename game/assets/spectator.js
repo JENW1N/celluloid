@@ -1,20 +1,17 @@
 /**
- * A seated spectator as a silhouette: a capsule torso leaning back a touch, a lap, shins to the
- * floor, a head. No arms, no face, few segments. The crowd is two hundred of these and should
- * read as a crowd, not as people. Feet on y = 0, seat at 0.45 so it sits on a 0.40 step with its
- * 0.05 plank; the game recolours the body per instance.
+ * A seated spectator as a silhouette: a capsule torso leaning back a touch and a head. No
+ * legs, no arms, no face, few segments. The crowd is two hundred of these and should read as
+ * a crowd, not as people. The base (y = 0) is the seat, so place it on the plank; the game
+ * recolours the torso per instance.
  */
 export default function (THREE) {
   const g = new THREE.Group();
   const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0, name: 'fabric' });
   const body = mat(0x2e3a5c), skin = mat(0xd8c0a0);
   const add = (geo, m, x, y, z, rx = 0) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); mesh.rotation.x = rx; g.add(mesh); return mesh; };
-  const seat = 0.45;
-  add(new THREE.CapsuleGeometry(0.15, 0.22, 3, 10), body, 0, seat + 0.26, -0.16, -0.14);   // torso
-  add(new THREE.BoxGeometry(0.32, 0.13, 0.32), body, 0, seat + 0.065, 0.0);                // thighs
-  add(new THREE.BoxGeometry(0.28, seat - 0.02, 0.11), body, 0, (seat - 0.02) / 2, 0.15);    // shins
-  add(new THREE.SphereGeometry(0.1, 12, 8), skin, 0, seat + 0.52 + 0.07, -0.18);            // head
-  g.userData.spectator = { seat: { y: seat, z: -0.155 } };
+  add(new THREE.CapsuleGeometry(0.15, 0.22, 3, 10), body, 0, 0.26, 0, -0.12);   // torso
+  add(new THREE.SphereGeometry(0.1, 12, 8), skin, 0, 0.6, -0.02);              // head
+  g.userData.spectator = { seat: { y: 0, z: 0 } };
   recentre(THREE, g);
   return g;
 }

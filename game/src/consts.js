@@ -29,6 +29,7 @@ export const PALETTE = {
   tableBlue: 0x2456a8, lineWhite: 0xf2f2ee, ink: 0x141620, courtRed: 0xa8383a, courtRedDark: 0x6f2a2c,
   wood: 0xd7a56e, rubberRed: 0xc81e2e, steel: 0x8a8f99, navy: 0x1e2a48, cyan: 0x4fe3ff, orange: 0xff7a30,
   crowd: [0x2e3a5c, 0x5a2e3a, 0x3a4a3a, 0x50505e], skin: 0xd8c0a0,
+  crowdVariety: [0xd94a4a, 0xf2b134, 0x4fb3e8, 0x67c27a, 0xe27d3f, 0x9b6bd6, 0xf2f2ee, 0x3b4a7a, 0xe86fa2, 0x2ec4b6, 0x8c5a3c, 0x1e2a48],
 };
 
 // The three opponents. speed is paddle metres per second, react the delay before it moves,

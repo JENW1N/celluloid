@@ -59,7 +59,7 @@ function makeRubberTexture() {
   for (let j = 3; j < S; j += 6) for (let i = 3 + ((j / 6) % 2) * 3; i < S; i += 6) { x.beginPath(); x.arc(i, j, 1.1, 0, Math.PI * 2); x.fill(); }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(1 / (2 * 0.0685), 1 / (2 * 0.072)); t.offset.set(0.5, 0.5);
+  t.repeat.set(1 / (2 * 0.0715), 1 / (2 * 0.075)); t.offset.set(0.5, 0.5);
   t.anisotropy = 4; t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
@@ -162,30 +162,32 @@ export async function buildArena(scene, { phone = false } = {}) {
   const seats = [];
   const seatLocal = new THREE.Matrix4(), tmp = new THREE.Matrix4();
   for (const bm of blocks) for (let r = 0; r < 5; r++) for (let k = 0; k < 8; k++) {
-    if (Math.random() > 0.55) continue;
+    if (Math.random() > 0.6) continue;
     _e.set(0, (Math.random() - 0.5) * 0.35, 0);
-    seatLocal.compose(_p.set(-1.75 + 0.5 * k + (Math.random() - 0.5) * 0.06, 0.4 * r, 1.545 - 0.8 * r), _q.setFromEuler(_e), _s);
+    // on the plank: row r's seat is 0.45 up and 0.8 back per row
+    seatLocal.compose(_p.set(-1.75 + 0.5 * k + (Math.random() - 0.5) * 0.06, 0.4 * r + 0.45, 1.39 - 0.8 * r), _q.setFromEuler(_e), _s);
     seats.push({ m: tmp.multiplyMatrices(bm, seatLocal).clone(), phase: Math.random() * Math.PI * 2, rate: 1.6 + Math.random() * 1.2, jump: Math.random() });
   }
-  const crowdColors = PALETTE.crowd.map((c) => new THREE.Color(c));
+  const crowdColors = PALETTE.crowdVariety.map((c) => new THREE.Color(c));
   const bodyHex = PALETTE.crowd[0];
   const crowdParts = instanceAsset(scene, spectator, seats.map((s) => s.m), {
     outline: 0, shadows: false,
-    colorFor: (i, mesh) => (mesh.material.userData.srcColor === bodyHex || (mesh.material.color && mesh.material.color.getHex() === bodyHex)) ? crowdColors[i % 4] : null,
+    colorFor: (i, mesh) => (mesh.material.userData.srcColor === bodyHex || (mesh.material.color && mesh.material.color.getHex() === bodyHex)) ? crowdColors[Math.floor(Math.random() * crowdColors.length)] : null,
   });
   out.crowd = {
     excite: 0, cheer: 0, t: 0,
     update(dt, excitement, cheer) {
       this.t += dt;
       this.excite += (excitement - this.excite) * (1 - Math.exp(-2 * dt));
-      this.cheer = Math.max(0, this.cheer - dt * 0.8);
+      this.cheer = Math.max(0, this.cheer - dt * 0.6);
       if (cheer > this.cheer) this.cheer = cheer;
       const amp = 0.006 + 0.028 * this.excite;
       const ch = this.cheer;
       for (let i = 0; i < seats.length; i++) {
         const s = seats[i];
         const wave = Math.sin(this.t * (2 + 4 * this.excite) * s.rate + s.phase);
-        const bob = amp * (0.5 + 0.5 * wave) + ch * 0.12 * Math.max(0, Math.sin(this.t * 9 + s.phase)) * (s.jump < 0.5 ? 1 : 0);
+        // a point: everyone bounces gently, out of step, and settles
+        const bob = amp * (0.5 + 0.5 * wave) + ch * ch * 0.05 * Math.abs(Math.sin(this.t * 11 + s.phase * 0.5));
         for (const part of crowdParts) {
           _m.multiplyMatrices(s.m, part.local);
           _m.elements[13] += bob;

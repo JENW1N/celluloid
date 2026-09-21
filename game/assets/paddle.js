@@ -1,5 +1,5 @@
 /**
- * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 6.5 mm, with a 6.5 mm wood lip
+ * A shakehand racket. The blade is a 0.157 x 0.150 plywood ellipse, 6.5 mm, with a 3.5 mm wood lip
  * showing around the rubber; each face carries a sponge layer under its topsheet so the rim
  * reads as two layers: red on +Z, black on -Z, 13.5 mm in all. The grip is a flared profile
  * with darker scales on both faces, two wood wings where it meets the blade, and a rounded
@@ -19,7 +19,7 @@ export default function (THREE) {
   const blackSponge = mat(0x30303f, 'fabric', 0.95);
   const add = (geo, m, x, y, z) => { const mesh = new THREE.Mesh(geo, m); mesh.position.set(x, y, z); g.add(mesh); return mesh; };
 
-  const RX = 0.075, RY = 0.0785, HL = 0.10, T = 0.0065, LIP = 0.0065;
+  const RX = 0.075, RY = 0.0785, HL = 0.08, T = 0.0065, LIP = 0.0035;
   const ellipse = (rx, ry) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0); return s; };
   const slab = (rx, ry, depth) => new THREE.ExtrudeGeometry(ellipse(rx, ry), { depth, bevelEnabled: false, curveSegments: 32 });
 
@@ -39,7 +39,7 @@ export default function (THREE) {
     s.bezierCurveTo(-w1 * 0.9, bottom + 0.035, -w0 * 0.95, top - 0.04, -w0, top);
     return s;
   };
-  add(new THREE.ExtrudeGeometry(profile(0.011, 0.017), { depth: 0.020, bevelEnabled: false, curveSegments: 8 }), grip, 0, 0, -0.010);
+  add(new THREE.ExtrudeGeometry(profile(0.012, 0.018), { depth: 0.020, bevelEnabled: false, curveSegments: 8 }), grip, 0, 0, -0.010);
   const scaleGeo = new THREE.ExtrudeGeometry(profile(0.0085, 0.0145), { depth: 0.0025, bevelEnabled: false, curveSegments: 8 });
   add(scaleGeo, scale, 0, 0, 0.010);
   add(scaleGeo, scale, 0, 0, -0.0125);
