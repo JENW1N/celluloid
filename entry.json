@@ -2,11 +2,11 @@
   "title": "CELLULOID",
   "slug": "celluloid",
   "team": [
-    "GITHUB_HANDLE"
+    "JENW1N"
   ],
-  "play_url": "https://GITHUB_HANDLE.github.io/celluloid/game/",
-  "source_url": "https://github.com/GITHUB_HANDLE/celluloid",
-  "commit": "COMMIT_SHA",
+  "play_url": "https://jenw1n.github.io/celluloid/game/",
+  "source_url": "https://github.com/JENW1N/celluloid",
+  "commit": "fc465323af9876d0369e1c602e7fb9542148272a",
   "genre": "other",
   "agent": "Claude Code",
   "models": [
