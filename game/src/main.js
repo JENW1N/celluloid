@@ -41,7 +41,7 @@ const G = {
   camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
   shake: 0, camKick: 0, padVis: [], chargeRing: null, serveMarker: null, hits: 0, overTimer: -1, lowFpsT: 0, dprDropped: false,
   lastPointT: -10, holdingBall: false, whooshT: 0, hitLog: [], gatherT: 0, focus: 1, apexCued: false,
-  ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [],
+  ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [], gameTime: 0, targetRing: null,
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
@@ -59,6 +59,10 @@ async function boot() {
   G.fx = new Impacts(scene);
   G.cloth = new NetCloth(G.arena.net);
   setupPaddleVisuals();
+  // where the ball will cross your paddle plane: a faint ring to put the blade on
+  G.targetRing = new THREE.Mesh(new THREE.RingGeometry(0.075, 0.088, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide }));
+  G.targetRing.visible = false; G.targetRing.renderOrder = 3;
+  scene.add(G.targetRing);
   G.serveMarker = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.06, 32), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
   G.serveMarker.rotation.x = -Math.PI / 2; G.serveMarker.visible = false; G.serveMarker.renderOrder = 3;
   scene.add(G.serveMarker);
@@ -188,7 +192,7 @@ function onNewServe() {
     G.serveX = clamp(G.serveX, -SERVE.xMax, SERVE.xMax);
     G.ui.hint(G.input.touch ? 'HOLD TOSS · LIFT AT THE TOP OF THE TOSS' : 'HOLD CLICK TO TOSS · RELEASE AT THE TOP OF THE TOSS · ← → PLACE');
     G.ui.tossVisible(true);
-    G.serveMarker.visible = true;
+    G.serveMarker.visible = false;                 // the toss follows the paddle; no marker needed
   } else {
     G.ui.hint(''); G.ui.tossVisible(false); G.serveMarker.visible = false;
   }
@@ -221,6 +225,7 @@ function idle(dt, now) {
   G.fx.update(dt);
   G.cloth.update(dt);
   G.arena.crowd.update(dt, 0.1, 0);
+  G.arena.atmosphere.update(dt);
   G.audio.update(dt, { rally: 0, tension: false, live: false, running: false });
 }
 
@@ -248,24 +253,27 @@ function update(dt, now, realDt) {
   // winding up slows the world: focus. The paddle keeps real time, everything else dilates.
   const focusT = paddle.charging ? 1 - 0.32 * paddle.charge : 1;
   G.focus += (focusT - G.focus) * (1 - Math.exp(-14 * dt));
-  const gdt = dt * G.focus;
-  bot.update(gdt, ball, match, now, paddle.pos.x, G.events);
+  const gdt = dt * G.focus * (LEVELS[G.level].slow || 1);
+  G.gameTime += gdt;
+  const gnow = G.gameTime;
+  bot.update(gdt, ball, match, gnow, paddle.pos.x, G.events);
   if (match.state === 'TOSS' && match.server === 1) G.ballLive = true;
   // physics
   if (G.ballLive) {
     stepWorld(ball, [paddle], gdt, G.events, Math.random);
     if (ball.netHold) G.cloth.press(ball.p.x, ball.p.y, ball.netHold, Math.abs(ball.p.z));
     const out = match.checkOut(ball);
-    if (out) handleOutcome(out, now);
+    if (out) handleOutcome(out, gnow);
     const dead = (ball.p.y - BALL.R < FLOOR_Y + 0.01 && ball.v.length() < 0.5) || Math.abs(ball.p.x) > 7 || Math.abs(ball.p.z) > 8 || ball.p.y < -1;
     if (dead) {
-      if (match.state === 'IN_PLAY') { const o = match.onEvent({ type: 'gone' }, now); if (o) handleOutcome(o, now); }
+      if (match.state === 'IN_PLAY') { const o = match.onEvent({ type: 'gone' }, gnow); if (o) handleOutcome(o, gnow); }
       if (match.state === 'TOSS') { match.tossFailed(); onNewServe(); }
       G.ballLive = false;
     }
   }
-  for (const e of G.events) handleEvent(e, now);
+  for (const e of G.events) handleEvent(e, gnow);
   G.events.length = 0;
+  updateTargetRing();
   const tr = match.update(gdt);
   if (tr === 'serve') onNewServe();
   if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; document.body.classList.remove('playing'); G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
@@ -287,10 +295,26 @@ function update(dt, now, realDt) {
   G.cloth.update(gdt);
   const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
   G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
+  G.arena.atmosphere.update(dt);
   G.arena.setLevel(rallyLvl);
   G.ui.rally(match.rally);
   const tension = match.gamePoint() >= 0 && match.state !== 'POINT_OVER' && match.state !== 'GAME_OVER';
   G.audio.update(dt, { rally: match.rally, tension, live: G.ballLive, running: true });
+}
+
+function updateTargetRing() {
+  const ring = G.targetRing, { ball, paddle, match } = G;
+  const want = G.running && LEVELS[G.level].aim && G.ballLive && match.state === 'IN_PLAY' && match.lastHitter === 1 && ball.v.z > 0.5 && ball.p.z < paddle.zBase - 0.05;
+  if (!want) { ring.visible = false; return; }
+  const zp = paddle.zBase;
+  const r = predict(ball, { maxT: 2, until: (b, t, ev) => b.p.z >= zp - 0.01 || ev.some((x) => x.type === 'floor' || x.type === 'netin' || (x.type === 'table' && x.side === 0 && ev.filter((y) => y.type === 'table' && y.side === 0).length >= 2)) });
+  if (!r.stop || r.state.p.z < zp - 0.03) { ring.visible = false; return; }
+  ring.visible = true;
+  ring.position.set(r.state.p.x, r.state.p.y, zp);
+  const near = clamp((ball.p.z + 0.4) / 2.0, 0, 1);            // fades in as the ball crosses the net
+  ring.material.opacity = 0.12 + 0.28 * near;
+  const s = 1 + 0.6 * (1 - near);
+  ring.scale.set(s, s, 1);
 }
 
 function computeReach() {
@@ -393,7 +417,7 @@ function handleEvent(e, now) {
     }
     case 'netclip': {
       audio.net('clip', e.speed);
-      cloth.impulse(e.x, e.y, e.dir, 0.02 + 0.04 * e.depth);
+      cloth.impulse(e.x, e.y, e.dir, 0.05 + 0.06 * e.depth, 0.2);
       fx.impact(_a.set(e.x, e.y, 0), _n.set(0, 0, -e.dir), 'NET', 6);
       ui.toast('NET CORD', 'net', 800);
       const res = match.onEvent(e, now);
@@ -403,12 +427,12 @@ function handleEvent(e, now) {
     }
     case 'netin': {
       audio.net('in', e.speed);
-      cloth.impulse(e.x, e.y, e.dir, 0.04 + 0.05 * clamp(e.speed / 15, 0, 1), 0.3);
+      cloth.impulse(e.x, e.y, e.dir, 0.07 + 0.08 * clamp(e.speed / 15, 0, 1), 0.3);
       const res = match.onEvent(e, now);
       if (res) handleOutcome(res, now);
       break;
     }
-    case 'nearmiss': audio.net('zip', e.speed); cloth.impulse(e.x, e.y, e.dir, 0.004, 0.1); break;
+    case 'nearmiss': audio.net('zip', e.speed); cloth.impulse(e.x, e.y, e.dir, 0.012 + 0.01 * clamp(e.speed / 15, 0, 1), 0.22); break;
     case 'post': { audio.net('post'); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
     case 'floor': { audio.floor(e.speed); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
     case 'ceiling': { const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
@@ -519,7 +543,7 @@ function layoutCamera() {
   const a = window.innerWidth / window.innerHeight;
   if (a < 0.85) { G.camBase.set(0, 2.35, 3.45); G.lookBase.set(0, 0.55, -1.0); G.fovBase = 64; }
   else if (a < 1.3) { G.camBase.set(0, 2.15, 3.5); G.lookBase.set(0, 0.6, -0.4); G.fovBase = 56; }
-  else { G.camBase.set(0, 1.95, 3.35); G.lookBase.set(0, 0.62, -0.4); G.fovBase = 48; }
+  else { G.camBase.set(0, 2.15, 3.35); G.lookBase.set(0, 0.6, -0.35); G.fovBase = 50; }
 }
 const _camT = new THREE.Vector3(), _lookT = new THREE.Vector3();
 function updateCamera(dt) {

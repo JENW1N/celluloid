@@ -77,6 +77,48 @@ function makeNetTexture() {
   return t;
 }
 
+/** Visible beams from the lamps to the table, and dust drifting through them. */
+function makeAtmosphere(scene) {
+  const beams = [];
+  for (const [x, z] of [[-2.2, -2.4], [2.2, 2.4], [-2.2, 2.4], [2.2, -2.4]]) {
+    const from = new THREE.Vector3(x, 6.3, z), to = new THREE.Vector3(0, 0.8, 0);
+    const len = from.distanceTo(to);
+    const geo = new THREE.ConeGeometry(1.5, len, 20, 1, true);
+    const col = new Float32Array(geo.attributes.position.count * 3);
+    for (let i = 0; i < geo.attributes.position.count; i++) {
+      const y = geo.attributes.position.getY(i) / len + 0.5;      // 1 at the apex (the lamp), 0 at the base
+      const b = 0.028 * Math.pow(y, 1.4);
+      col[i * 3] = b; col[i * 3 + 1] = b * 0.9; col[i * 3 + 2] = b * 0.7;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide, fog: false }));
+    m.position.copy(from).add(to).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), from.clone().sub(to).normalize());
+    m.renderOrder = 2;
+    scene.add(m); beams.push(m);
+  }
+  const N = 420, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 7; pos[i * 3 + 1] = 0.3 + Math.random() * 6; pos[i * 3 + 2] = (Math.random() - 0.5) * 8; seed[i] = Math.random() * 100; }
+  const dg = new THREE.BufferGeometry();
+  dg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const dust = new THREE.Points(dg, new THREE.PointsMaterial({ color: 0xffe0b0, size: 0.018, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+  dust.renderOrder = 2;
+  scene.add(dust);
+  let t = 0;
+  return {
+    update(dt) {
+      t += dt;
+      const a = dg.attributes.position.array;
+      for (let i = 0; i < N; i++) {
+        a[i * 3 + 1] -= 0.05 * dt;
+        a[i * 3] += Math.sin(t * 0.7 + seed[i]) * 0.02 * dt;
+        if (a[i * 3 + 1] < 0.3) a[i * 3 + 1] = 6.3;
+      }
+      dg.attributes.position.needsUpdate = true;
+    },
+  };
+}
+
 function makeDome(scene) {
   const dome = new THREE.Mesh(new THREE.SphereGeometry(48, 24, 12), new THREE.ShaderMaterial({
     uniforms: { top: { value: new THREE.Color(0x05070f) }, mid: { value: new THREE.Color(0x151d38) }, bottom: { value: new THREE.Color(0x261620) } },
@@ -90,7 +132,14 @@ function makeDome(scene) {
 }
 
 function setupLights(scene, phone) {
-  const key = new THREE.DirectionalLight(0xfff1dc, 1.7);
+  scene.fog = new THREE.Fog(0x0b0e1a, 9, 34);
+  // two warm pools on the table from the trusses
+  for (const [x, z] of [[-2.2, -2.4], [2.2, 2.4]]) {
+    const sp = new THREE.SpotLight(0xffe2b8, 34, 16, Math.PI / 7, 0.6, 2);
+    sp.position.set(x, 6.3, z); sp.target.position.set(0, 0.76, 0);
+    scene.add(sp); scene.add(sp.target);
+  }
+  const key = new THREE.DirectionalLight(0xfff1dc, 1.45);
   key.position.set(2.6, 7.5, 3.2);
   key.target.position.set(0, 0.5, -0.4);
   scene.add(key); scene.add(key.target);
@@ -99,7 +148,7 @@ function setupLights(scene, phone) {
   const c = key.shadow.camera;
   c.left = -5.5; c.right = 5.5; c.top = 6; c.bottom = -6; c.near = 1; c.far = 22;
   key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
-  const hemi = new THREE.HemisphereLight(0x8fb4d8, 0x5a2a2a, 0.6);
+  const hemi = new THREE.HemisphereLight(0x8fb4d8, 0x5a2a2a, 0.42);
   scene.add(hemi);
   const rim = new THREE.DirectionalLight(0x4fe3ff, 0.25);
   rim.position.set(-3, 3, -6);
@@ -111,6 +160,7 @@ export async function buildArena(scene, { phone = false } = {}) {
   const out = { banners: [], lenses: [] };
   makeDome(scene);
   out.lights = setupLights(scene, phone);
+  out.atmosphere = makeAtmosphere(scene);
 
   const floor = toonify(await ASSET('./assets/court_floor.js'));
   floor.traverse((o) => { if (o.isMesh) o.castShadow = false; });
@@ -128,7 +178,7 @@ export async function buildArena(scene, { phone = false } = {}) {
     out.net.userData.cloth.material = m;
     out.net.userData.cloth.castShadow = false;
   }
-  out.net.position.set(0, TABLE.H, 0);
+  out.net.position.set(0, TABLE.H - (out.net.userData.net ? out.net.userData.net.surfaceY : 0), 0);
   scene.add(out.net);
   out.paddles = [];
   const rubber = makeRubberTexture();

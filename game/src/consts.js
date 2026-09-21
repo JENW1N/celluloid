@@ -36,9 +36,9 @@ export const PALETTE = {
 // sigma the landing scatter in metres, whiff the chance it swings through nothing. All three
 // reach an ordinary return; what separates them is pace, spin, placement, errors and smashing.
 export const LEVELS = {
-  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.26, sigmaTheta: 0.05, spd: [5.5, 8.0], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.10, place: 'center', early: 0, serveSpd: [4.8, 6.0], serveSpin: 0, assist: 1.35, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, wrist: 0.65 },
-  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.2, assistAngle: 0.16, assistSpin: 260, assistPace: 0.8, wrist: 0.45 },
-  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.05, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, wrist: 0.3 },
+  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.26, sigmaTheta: 0.05, spd: [5.5, 8.0], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.10, place: 'center', early: 0, serveSpd: [4.8, 6.0], serveSpin: 0, assist: 1.65, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, wrist: 0.65, slow: 0.88, aim: true },
+  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.45, assistAngle: 0.16, assistSpin: 260, assistPace: 0.8, wrist: 0.45, slow: 0.94, aim: true },
+  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.2, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, wrist: 0.3, slow: 1.0, aim: false },
 };
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

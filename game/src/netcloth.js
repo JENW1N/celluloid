@@ -24,7 +24,7 @@ export class NetCloth {
     this.worldToLocal = new THREE.Matrix4().copy(this.cloth.matrixWorld).invert();
     this.tapeBase = this.tape ? this.tape.position.z : 0;
     this.tz = 0; this.tv = 0; this.ty = 0; this.tvy = 0;
-    this.active = 0;
+    this.active = 0; this.t = 0;
     this.pressing = null;
     this._v = new THREE.Vector3();
   }
@@ -52,15 +52,18 @@ export class NetCloth {
   }
   update(dt) {
     if (!this.cloth) return;
-    if (this.active <= 0) return;
     const h = Math.min(dt, 1 / 30);
+    this.t += h;
     const pos = this.pos, prev = this.prev, base = this.base, cols = this.cols, rows = this.rows;
     let energy = 0;
     for (let iy = 1; iy < rows; iy++) for (let ix = 1; ix < cols - 1; ix++) {
       const i = (iy * cols + ix) * 3 + 2;
-      const z = pos[i], vz = (z - prev[i]) * 0.965;
+      const z = pos[i], vz = (z - prev[i]) * 0.978;
       const nb = (pos[i - 3] + pos[i + 3] + pos[i - cols * 3] + (iy < rows - 1 ? pos[i + cols * 3] : z)) * 0.25;
-      const acc = 260 * (base[i] - z) + 1600 * (nb - z);
+      // a breath of air moves the mesh all the time, more toward the bottom, so it is never rigid
+      const sag = iy / (rows - 1);
+      const wind = 0.9 * sag * Math.sin(this.t * 1.7 + base[i - 2] * 3.1) + 0.5 * sag * Math.sin(this.t * 2.9 - base[i - 2] * 5.3);
+      const acc = 140 * (base[i] - z) + 1100 * (nb - z) + wind;
       prev[i] = z;
       pos[i] = z + vz + acc * h * h;
       energy += Math.abs(vz) + Math.abs(pos[i] - base[i]);
@@ -71,7 +74,7 @@ export class NetCloth {
         const dx = base[i * 3] - x, dy = base[i * 3 + 1] - y, d = Math.hypot(dx, dy);
         if (d > r) continue;
         const want = dir * (depth + 0.02) * (1 - (d / r) * (d / r));
-        if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.002; }
+        if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.005; }
       }
       this.tv += dir * depth * 3 * h * 30;
       this.pressing = null;
@@ -79,12 +82,12 @@ export class NetCloth {
     const attr = this.cloth.geometry.attributes.position;
     attr.array.set(pos); attr.needsUpdate = true;
     if (this.tape) {
-      const acc = -260 * this.tz - 14 * this.tv;
+      const acc = -170 * this.tz - 8 * this.tv;
       this.tv += acc * h; this.tz += this.tv * h;
       this.tape.position.z = this.tapeBase + this.tz;
       this.tape.rotation.x = this.tz * 4;
       energy += Math.abs(this.tz) * 20;
     }
-    if (energy < 0.002) this.active--; else this.active = 3;
+    this.active = 3;
   }
 }

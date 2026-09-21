@@ -73,11 +73,11 @@ export class BallVisual {
     this.spinG.add(asset);
     // where the ball is hidden behind something, a glowing ring shows through: the ring is
     // drawn only where the depth buffer already holds something nearer (GreaterDepth)
-    this.xray = new THREE.Mesh(new THREE.RingGeometry(BALL.R * 1.15, BALL.R * 1.6, 32), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.9, depthTest: true, depthWrite: false, depthFunc: THREE.GreaterDepth, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    this.xray = new THREE.Mesh(new THREE.RingGeometry(BALL.R * 1.2, BALL.R * 1.45, 32), new THREE.MeshBasicMaterial({ color: PALETTE.cyan, transparent: true, opacity: 0.9, depthTest: true, depthWrite: false, depthFunc: THREE.GreaterDepth, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
     this.xray.renderOrder = 12;
     scene.add(this.xray);
     scene.add(this.root);
-    this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.0025, 6, 32), new THREE.MeshBasicMaterial({ color: PALETTE.orange, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.halo = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.0014, 6, 32), new THREE.MeshBasicMaterial({ color: PALETTE.orange, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
     this.halo.renderOrder = 4;
     this.root.add(this.halo);
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.03, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -92,7 +92,7 @@ export class BallVisual {
   flash() { this.flashT = 0.25; }
   impact(normal, strength) {
     this.axis.copy(normal).normalize();
-    this.sqA = Math.max(this.sqA * Math.exp(-this.sqT * 12), clamp(strength, 0.08, 0.4));
+    this.sqA = Math.max(this.sqA * Math.exp(-this.sqT * 16), clamp(strength * 0.55, 0.05, 0.2));
     this.sqT = 0;
   }
   /** Colour by what the spin does to a ball travelling along v. */
@@ -116,7 +116,8 @@ export class BallVisual {
     this.root.position.copy(ball.p);
     this.xray.position.copy(ball.p);
     this.xray.lookAt(this.camera.position);
-    this.xray.material.opacity = 0.7 + 0.25 * Math.sin(now * 14);
+    this.xray.visible = visible && ball.p.z > 0.9;
+    this.xray.material.opacity = 0.55 + 0.2 * Math.sin(now * 14);
     // spin: real axis, capped visual rate so direction reads instead of strobing
     const ws = ball.w.length();
     if (ws > 1) {
@@ -127,9 +128,9 @@ export class BallVisual {
     }
     // squash: a closed-form damped wobble, stable at any frame rate
     this.sqT += dt;
-    this.squash = this.sqT < 0.5 ? this.sqA * Math.exp(-this.sqT * 12) * Math.cos(this.sqT * 30) : 0;
+    this.squash = this.sqT < 0.4 ? this.sqA * Math.exp(-this.sqT * 16) * Math.cos(this.sqT * 30) : 0;
     const speed = ball.v.length();
-    const stretch = clamp(speed / 75, 0, 0.28);
+    const stretch = clamp(speed / 90, 0, 0.16);
     if (Math.abs(this.squash) > 0.01) {
       this.squashG.quaternion.setFromUnitVectors(Z, this.axis);
       const s = this.squash;
@@ -142,7 +143,7 @@ export class BallVisual {
     // halo: perpendicular to the spin axis, brighter with spin
     const col = this.colorFor(ball.w, ball.v);
     this.spinColor.lerp(col, 1 - Math.exp(-10 * dt));
-    let haloOp = clamp((ws - 60) / 450, 0, 0.75);
+    let haloOp = clamp((ws - 150) / 600, 0, 0.4);
     this.halo.material.color.copy(this.spinColor);
     if (this.flashT > 0) { this.flashT -= dt; haloOp = Math.max(haloOp, 0.9 * (this.flashT / 0.25)); this.halo.material.color.setHex(0xffffff); this.halo.scale.setScalar(1.6 - this.flashT); }
     this.halo.material.opacity = haloOp;
