@@ -9,7 +9,7 @@
  * Touch: the first finger on #stick drags the paddle like a trackpad, a second finger anywhere
  * charges while held and swings when lifted, and #toss serves.
  */
-import { PLAYER } from './consts.js?v=202609211927';
+import { PLAYER } from './consts.js?v=202609212113';
 
 /** Some drivers send key without code; take either. */
 const KEYS = { w: 'KeyW', r: 'KeyR', m: 'KeyM', ' ': 'Space', 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', escape: 'Escape' };

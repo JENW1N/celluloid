@@ -1,0 +1,133 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T21:16:35.921Z",
+  "desktop": false,
+  "level": "rookie",
+  "style": "charge",
+  "ready_s": 2.413,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 23.76,
+  "contacts": 11,
+  "longest_rally": 3,
+  "points": 11,
+  "score": [
+    3,
+    8
+  ],
+  "samples": 1652,
+  "log": [
+    "CPU LONG r1 0-1",
+    "CPU ACE r0 0-2",
+    "YOU WINNER r2 1-2",
+    "CPU WINNER r1 1-3",
+    "CPU ACE r0 1-4",
+    "CPU ACE r0 1-5",
+    "CPU WINNER r1 1-6",
+    "CPU WINNER r3 1-7",
+    "YOU WINNER r1 2-7",
+    "CPU ACE r0 2-8",
+    "YOU WINNER r2 3-8"
+  ],
+  "hits": [
+    "EDGE/-@15.7",
+    "S:GOOD/assisted@3.8",
+    "THIN/assisted@32.2",
+    "S:GOOD/assisted@3.8",
+    "S:GOOD/assisted@3.7",
+    "S:GOOD/assisted@3.8",
+    "GOOD/assisted@7.2",
+    "THIN/assisted@30.3",
+    "S:GOOD/assisted@3.7",
+    "GOOD/assisted@8.1",
+    "S:GOOD/assisted@3.8"
+  ],
+  "final": {
+    "pos": [
+      -6.675715265551045e-7,
+      0.9183898622943989
+    ],
+    "fps": 240,
+    "speed": 3.9365576161032316,
+    "score": [
+      3,
+      8
+    ],
+    "over": false,
+    "draws": 166,
+    "tris": 128028,
+    "rally": 0,
+    "hits": 11,
+    "state": "PLAY",
+    "ball": [
+      -0.00001342865623981489,
+      0.9429911186441383,
+      -1.4209832924342858
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        194.99973567070316,
+        615.8252575246211
+      ],
+      "pxPerM": [
+        302.40790760233864,
+        -252.0280015523167
+      ]
+    },
+    "points": 11,
+    "ballv": [
+      -0.0001234365570762333,
+      0.762791604443163,
+      -3.8619470242165157
+    ],
+    "spin": 196.65965171064622,
+    "level": "rookie",
+    "server": 0,
+    "match": "IN_PLAY",
+    "live": true,
+    "last": [
+      0,
+      "WINNER",
+      2
+    ],
+    "lastHit": {
+      "q": "GOOD",
+      "a": "assisted",
+      "serve": true,
+      "before": 10.8,
+      "speed": 3.8,
+      "el": -0.2,
+      "spin": -351,
+      "wy": 0,
+      "wz": 0,
+      "spin0": -351,
+      "wy0": 0,
+      "z": 1.52,
+      "y": 1.16,
+      "pad": 5.5,
+      "swingT": 0.038,
+      "phase": 0.97,
+      "pend": false,
+      "sinceSwing": null,
+      "auto": null,
+      "hold": null,
+      "tReal": null
+    },
+    "slow": []
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.587,
+    10.088,
+    17.618,
+    25.088,
+    32.606,
+    40.098,
+    47.597,
+    55.118
+  ],
+  "fails": [],
+  "result": "PASS"
+}

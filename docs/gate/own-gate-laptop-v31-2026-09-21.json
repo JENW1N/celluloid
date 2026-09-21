@@ -1,0 +1,137 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T21:14:25.684Z",
+  "desktop": true,
+  "level": "novice",
+  "style": "charge",
+  "ready_s": 2.461,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 20.63,
+  "contacts": 17,
+  "longest_rally": 5,
+  "points": 9,
+  "score": [
+    6,
+    3
+  ],
+  "samples": 1569,
+  "log": [
+    "YOU WINNER r1 1-0",
+    "CPU LONG r3 1-1",
+    "YOU WINNER r2 2-1",
+    "YOU WINNER r2 3-1",
+    "CPU LONG r5 3-2",
+    "YOU WINNER r1 4-2",
+    "CPU LONG r4 4-3",
+    "YOU WINNER r2 5-3",
+    "YOU WINNER r1 6-3"
+  ],
+  "hits": [
+    "GOOD/assisted@6.6",
+    "THIN/assisted@8.6",
+    "THIN/none@28.5(in28.5 el1.402 z1.59 y0.73)",
+    "S:GOOD/assisted@3.8",
+    "GOOD/assisted@26.2",
+    "S:GOOD/assisted@3.7",
+    "GOOD/assisted@21.7",
+    "THIN/assisted@9",
+    "THIN/assisted@8.5",
+    "PERFECT/none@19.1(in19.1 el0.87 z1.62 y0.65)",
+    "GOOD/assisted@23.9",
+    "S:GOOD/assisted@3.7",
+    "THIN/assisted@8.8",
+    "EDGE/-@11.3",
+    "S:GOOD/assisted@3.8",
+    "GOOD/assisted@24",
+    "THIN/assisted@31.4"
+  ],
+  "final": {
+    "pos": [
+      -0.00008891068204231328,
+      0.920114621143982
+    ],
+    "fps": 240,
+    "speed": 0,
+    "score": [
+      6,
+      3
+    ],
+    "over": false,
+    "draws": 211,
+    "tris": 147092,
+    "rally": 0,
+    "hits": 17,
+    "state": "PLAY",
+    "ball": [
+      -1.324482831685849,
+      0.18987038204419687,
+      -8.025518904406487
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        639.9921589816117,
+        592.9996039094968
+      ],
+      "pxPerM": [
+        414.22643059809275,
+        -352.62494973892217
+      ]
+    },
+    "points": 9,
+    "ballv": [
+      0.001433600486068591,
+      -0.651847578333941,
+      -13.584631430499229
+    ],
+    "spin": 1004.9818929203203,
+    "level": "novice",
+    "server": 1,
+    "match": "POINT_OVER",
+    "live": false,
+    "last": [
+      0,
+      "WINNER",
+      1
+    ],
+    "lastHit": {
+      "q": "THIN",
+      "a": "assisted",
+      "serve": false,
+      "before": 31.4,
+      "speed": 31.4,
+      "el": 0.118,
+      "spin": -1527,
+      "wy": -297,
+      "wz": -35,
+      "spin0": -1527,
+      "wy0": -297,
+      "z": 1.58,
+      "y": 0.92,
+      "pad": 10.6,
+      "swingT": 0.05,
+      "phase": 0.98,
+      "pend": false,
+      "sinceSwing": 0.087,
+      "auto": false,
+      "hold": 0.041,
+      "tReal": 0
+    },
+    "slow": []
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.656,
+    10.111,
+    17.601,
+    25.123,
+    32.609,
+    40.1,
+    47.611,
+    55.099
+  ],
+  "fails": [],
+  "result": "PASS"
+}

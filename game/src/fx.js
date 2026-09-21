@@ -8,7 +8,7 @@
  * sparks. Everything here is built from Three.js constructors; nothing is a file.
  */
 import * as THREE from 'three';
-import { BALL, PALETTE, clamp } from './consts.js?v=202609211927';
+import { BALL, PALETTE, clamp } from './consts.js?v=202609212113';
 
 const UP = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 const _q = new THREE.Quaternion(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _col = new THREE.Color();
@@ -176,43 +176,77 @@ export class BallVisual {
  * away. Instanced, unlit, flat: it is drawn like everything else here.
  */
 /**
- * The paddle's echo: two faint ink outlines of the blade where it was 50 and 100 ms ago, the
- * way a hand-drawn frame shows motion, shown only while the blade moves across its plane (a
- * lunge is the ghosts' job) and fading with speed. No light, no streak: a line and then none.
+ * A speed line: a short, light, translucent streak that tapers to nothing, drawn as a ribbon of
+ * recent points facing the camera. Normal blending, so it reads as a pencil stroke, not a light.
+ */
+class Streak {
+  constructor(scene, n = 12, w = 0.003, life = 0.1, color = 0xd4d7df) {
+    this.n = n; this.pts = []; this.w = w; this.life = life;
+    const geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(n * 2 * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    const idx = [];
+    for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx);
+    this.mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    this.mesh.frustumCulled = false; this.mesh.renderOrder = 5; this.mesh.visible = false;
+    scene.add(this.mesh);
+  }
+  push(p, t) {
+    const last = this.pts[0];
+    if (last && (last.p.distanceToSquared(p) < 1e-6 || t - last.t < 0.007)) return;
+    this.pts.unshift({ p: p.clone(), t });
+    while (this.pts.length > this.n) this.pts.pop();
+  }
+  clear() { this.pts.length = 0; this.mesh.visible = false; }
+  update(now, camera, opacity) {
+    while (this.pts.length && now - this.pts[this.pts.length - 1].t > this.life) this.pts.pop();
+    const n = this.pts.length;
+    if (n < 2 || opacity < 0.01) { this.mesh.visible = false; return; }
+    this.mesh.visible = true; this.mesh.material.opacity = opacity;
+    for (let i = 0; i < this.n; i++) {
+      const k = Math.min(i, n - 1), pt = this.pts[k];
+      const prev = this.pts[Math.max(0, k - 1)].p, next = this.pts[Math.min(n - 1, k + 1)].p;
+      _a.copy(prev).sub(next);
+      if (_a.lengthSq() < 1e-8) _a.set(0, 0, 1);
+      _c.copy(camera.position).sub(pt.p);
+      _b.crossVectors(_a, _c).normalize();
+      const fade = 1 - k / Math.max(1, n - 1);
+      const w = this.w * fade * fade;                                // to a point at the tail
+      const o = i * 6;
+      this.pos[o] = pt.p.x + _b.x * w; this.pos[o + 1] = pt.p.y + _b.y * w; this.pos[o + 2] = pt.p.z + _b.z * w;
+      this.pos[o + 3] = pt.p.x - _b.x * w; this.pos[o + 4] = pt.p.y - _b.y * w; this.pos[o + 5] = pt.p.z - _b.z * w;
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+/**
+ * Three speed lines behind a blade moving across its plane: light grey, translucent, a tenth
+ * of a second long, spread across the blade as the camera sees it. Very little, and only when
+ * the blade really moves; a lunge is left to the ghosts.
  */
 export class PaddleTrail {
-  constructor(scene, rx = 0.075, ry = 0.0785) {
-    this.hist = [];                                        // { p, q, t }, newest first, time-spaced
-    this.rings = [];
-    for (const alpha of [0.3, 0.16]) {
-      const m = new THREE.Mesh(new THREE.TorusGeometry(1, 0.0016, 6, 56), new THREE.MeshBasicMaterial({ color: 0x0b0e1a, transparent: true, opacity: 0, depthWrite: false }));
-      m.scale.set(rx, ry, 1); m.renderOrder = 3; m.visible = false; m.frustumCulled = false;
-      scene.add(m);
-      this.rings.push({ m, alpha, ago: this.rings.length === 0 ? 0.05 : 0.1 });
-    }
-    this.inPlane = new THREE.Vector3(); this.strength = 0;
-    this._q = new THREE.Quaternion();
+  constructor(scene, rx = 0.075) {
+    this.rx = rx;
+    this.lines = [-0.55, 0, 0.55].map((off) => ({ off, s: new Streak(scene) }));
+    this.inPlane = new THREE.Vector3(); this.t = new THREE.Vector3(); this.cam = new THREE.Vector3(); this.root = new THREE.Vector3();
+    this.strength = 0;
   }
-  clear() { this.hist.length = 0; this.strength = 0; for (const r of this.rings) r.m.visible = false; }
-  /** pivot: the blade's visual pivot (position and orientation); normal, vel: the paddle's, in world space. */
-  update(pivot, normal, vel, now, camera, dt) {
+  clear() { for (const l of this.lines) l.s.clear(); this.strength = 0; }
+  /** pos: blade centre; normal: face normal; vel: blade velocity, all in world space. */
+  update(pos, normal, vel, now, camera, dt) {
     this.inPlane.copy(vel).addScaledVector(normal, -vel.dot(normal));
     const s = this.inPlane.length();
-    const want = Math.min(1, Math.max(0, (s - 0.9) / 2.6));
-    this.strength += (want - this.strength) * (1 - Math.exp(-14 * dt));
-    const last = this.hist[0];
-    if (!last || now - last.t >= 0.012) {
-      this.hist.unshift({ p: pivot.position.clone(), q: pivot.quaternion.clone(), t: now });
-      while (this.hist.length > 16) this.hist.pop();
-    }
-    for (const r of this.rings) {
-      let pick = null;
-      for (const h of this.hist) { if (now - h.t >= r.ago) { pick = h; break; } }
-      const a = this.strength * r.alpha;
-      if (!pick || a < 0.02) { r.m.visible = false; continue; }
-      r.m.visible = true;
-      r.m.position.copy(pick.p); r.m.quaternion.copy(pick.q);
-      r.m.material.opacity = a;
+    const want = Math.min(1, Math.max(0, (s - 1.0) / 2.6));
+    this.strength += (want - this.strength) * (1 - Math.exp(-16 * dt));
+    this.cam.copy(camera.position).sub(pos);
+    this.t.crossVectors(this.cam, this.inPlane);
+    if (this.t.lengthSq() < 1e-6) this.t.set(0, 1, 0);
+    this.t.normalize();
+    for (const l of this.lines) {
+      l.s.push(this.root.copy(pos).addScaledVector(this.t, l.off * this.rx), now);
+      l.s.update(now, camera, this.strength * 0.28);
     }
   }
 }

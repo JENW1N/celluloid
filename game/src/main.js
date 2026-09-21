@@ -6,18 +6,18 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609211927';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211927';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211927';
-import { PlayerPaddle } from './player.js?v=202609211927';
-import { Input } from './input.js?v=202609211927';
-import { Match } from './rules.js?v=202609211927';
-import { Bot } from './bots.js?v=202609211927';
-import { AudioEngine } from './audio.js?v=202609211927';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609211927';
-import { NetCloth } from './netcloth.js?v=202609211927';
-import { buildArena, ASSET_LIST } from './arena.js?v=202609211927';
-import { UI } from './ui.js?v=202609211927';
+import { preloadAssets } from '../assetlib.js?v=202609212113';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609212113';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609212113';
+import { PlayerPaddle } from './player.js?v=202609212113';
+import { Input } from './input.js?v=202609212113';
+import { Match } from './rules.js?v=202609212113';
+import { Bot } from './bots.js?v=202609212113';
+import { AudioEngine } from './audio.js?v=202609212113';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609212113';
+import { NetCloth } from './netcloth.js?v=202609212113';
+import { buildArena, ASSET_LIST } from './arena.js?v=202609212113';
+import { UI } from './ui.js?v=202609212113';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -61,7 +61,9 @@ async function boot() {
   G.ballVis = new BallVisual(G.arena.ball, scene, camera);
   G.fx = new Impacts(scene);
   G.confetti = new Confetti(scene);
-  G.padTrail = new PaddleTrail(scene, PADDLE.rx, PADDLE.ry);
+  G.padTrail = new PaddleTrail(scene, PADDLE.rx);
+  G.botTrail = new PaddleTrail(scene, PADDLE.rx);
+  G.botPrev = new THREE.Vector3(); G.botVel = new THREE.Vector3();
   G.cloth = new NetCloth(G.arena.net);
   setupPaddleVisuals();
   // where the ball will cross your paddle plane: a faint ring to put the blade on
@@ -253,7 +255,7 @@ function idle(dt, now) {
   if (G.hasPointer && !G.input.touch) projectPointer();
   G.paddle.update(dt);
   updatePaddleVisual(0, G.paddle.pos, G.paddle.normal, -1, G.paddle.flip);
-  G.padTrail.update(G.padVis[0], G.paddle.normal, G.paddle.vel, now, camera, dt);
+  G.padTrail.update(G.paddle.pos, G.paddle.normal, G.paddle.vel, now, camera, dt);
   if (G.bot) updatePaddleVisual(1, G.bot.visualPos(_a), G.bot.normal, 1, G.bot.flip);
   else updatePaddleVisual(1, _a.set(0.2, TABLE.H + 0.24, -PLAYER.z0), _n.set(0, 0, 1), 1, 0);
   G.ballVis.update(dt, G.ball, now, true, TABLE.H);
@@ -353,8 +355,10 @@ function update(dt, now, realDt) {
   if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
   // visuals: the player sees the red side of their own blade; the wrist cocks while charging
   updatePaddleVisual(0, paddle.pos, paddle.normal, -1, paddle.flip, paddle.cock(), paddle.charge >= 0.999 && paddle.charging);
-  G.padTrail.update(G.padVis[0], paddle.normal, paddle.vel, now, camera, dt);
+  G.padTrail.update(paddle.pos, paddle.normal, paddle.vel, now, camera, dt);
   updatePaddleVisual(1, bot.visualPos(_a), bot.normal, 1, bot.flip);
+  G.botVel.copy(_a).sub(G.botPrev).divideScalar(Math.max(dt, 1e-4)); G.botPrev.copy(_a);
+  G.botTrail.update(_a, bot.normal, G.botVel, now, camera, dt);
   updateGhosts(paddle);
   const ch = paddle.charging ? paddle.charge : 0;
   updateChargeRing(ch, paddle.charging);
@@ -564,9 +568,9 @@ function applyAssistInner(isServe) {
     if (r > 0) {
       // too fast: topspin first, then pace comes off (with topspin, then without): the fastest
       // pace that lands, by bisection between the level's floor and the shot as hit
-      const ts = Math.min(spinMax, 320);
-      if (ts > 0 && solve(speed, ts) === 0) return commit();
-      if (spinMax >= 400 - 1e-6 && budget > 0 && solve(speed, 400) === 0) return commit();
+      // topspin is only added to a ball that has none or some already: a chop stays a chop
+      const chopped = b.w.x * topspinSign < -40;
+      const ts = chopped ? 0 : Math.min(spinMax, 320);
       const paceDown = (dw) => {
         let lo = paceMin, hi = 1;
         const rl = solve(speed * lo, dw);
@@ -579,6 +583,10 @@ function applyAssistInner(isServe) {
         }
         return null;
       };
+      // a serve takes pace off before it takes spin on: what was brushed on it stays its character
+      if (isServe && paceMin < 1 - 1e-6) { const p0 = paceDown(0); if (p0) return p0; }
+      if (ts > 0 && solve(speed, ts) === 0) return commit();
+      if (!chopped && spinMax >= 400 - 1e-6 && budget > 0 && solve(speed, 400) === 0) return commit();
       if (paceMin < 1 - 1e-6) {
         if (ts > 0 && budget > 0) { const p = paceDown(ts); if (p) return p; }
         if (budget > 0) { const p = paceDown(0); if (p) return p; }
@@ -651,7 +659,7 @@ function handleEvent(e, now) {
       let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
       if (isPlayer && e.edge) { G.hitLog.push({ q: 'EDGE', a: '-', serve: !!(res && res.serve !== undefined), speed: +G.ball.v.length().toFixed(1), rho: +e.rho.toFixed(2) }); if (G.hitLog.length > 40) G.hitLog.shift(); }
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
-        const before = G.ball.v.length();
+        const before = G.ball.v.length(), spin0 = Math.round(G.ball.w.x), wy0 = Math.round(G.ball.w.y);
         if (res && res.serve !== undefined) {
           // a brushed toss can be dragged along the face into a drive: a serve keeps its spin,
           // within reason, but never its pace
@@ -666,7 +674,7 @@ function handleEvent(e, now) {
         computeReachLater();
         const v = G.ball.v;
         const sw = G.lastSwing && G.time - G.lastSwing.t < 1.5 ? G.lastSwing : null;
-        G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), wy: Math.round(G.ball.w.y), wz: Math.round(G.ball.w.z), z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1),
+        G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), wy: Math.round(G.ball.w.y), wz: Math.round(G.ball.w.z), spin0, wy0, z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1),
           swingT: +paddle.swingT.toFixed(3), phase: +timing.phase.toFixed(2), pend: wasPending, sinceSwing: sw ? +(G.time - sw.t).toFixed(3) : null, auto: sw ? sw.auto : null, hold: sw ? +(sw.hold || 0).toFixed(3) : null, tReal: sw ? +(sw.tReal || 0).toFixed(3) : null });
         if (G.hitLog.length > 40) G.hitLog.shift();
       }
@@ -875,5 +883,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609211927';
+import { solveShot } from './bots.js?v=202609212113';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };

@@ -42,23 +42,29 @@ for (const t of trials) {
     const P = G.paddle;
     P.charging = false; P.pending = false; P.swingT = -1; P.magnet.set(0, 0);
     if (G.match.state === 'GAME_OVER' || !G.running) { document.getElementById('startb').click(); await sleep(1500); }
-    if (mode === 'serve' || mode === 'serveflick' || mode === 'serveflickside') {
-      // the player's own serve: hold to toss, release at the top, and in flick mode brush upward
-      // over the last frames before the release; the spin the ball leaves with is the measure
+    if (mode === 'serve' || mode === 'serveflick' || mode === 'serveflickside' || mode === 'serveflickdown') {
+      // the player's own serve: a steady cursor sits by the hand (the way a mouse does), hold to
+      // toss, release at the top; in a flick mode the cursor moves 9 cm over the last four
+      // frames before the release, up, down or sideways; the spin the ball leaves with is the measure
       if (!(await until(() => G.match.state === 'SERVE_WAIT', 12000))) return `${level} ${mode}: no serve wait (${G.match.state})`;
       G.match.server = 0;
-      await sleep(300);
+      // the cursor settles by the hand, where the toss will peak, well before the toss: a mouse
+      // does not jump, and the flick memory must hold nothing but the flick
+      const cur = { x: G.serveX, y: 0.76 + 0.16 + 0.2 };
+      const hold = async (ms) => { const t1 = Date.now(); while (Date.now() - t1 < ms) { P.setTarget(cur.x, cur.y); await sleep(8); } };
+      await hold(500);
       const hits0 = G.hits;
       D.hooks.chargeStart();
-      await until(() => G.ballLive && G.ball.v.y < 0.55 && G.ball.v.y > -5, 3000);
-      if (mode === 'serveflick') { const y0 = P.target.y; for (let k = 1; k <= 4; k++) { P.setTarget(P.target.x, y0 + 0.022 * k); await sleep(8); } }
-      if (mode === 'serveflickside') { const x0 = P.target.x; for (let k = 1; k <= 4; k++) { P.setTarget(x0 + 0.022 * k, P.target.y); await sleep(8); } }
+      const t2 = Date.now();
+      while (!(G.ballLive && G.ball.v.y < 0.55 && G.ball.v.y > -5) && Date.now() - t2 < 3000) { P.setTarget(cur.x, cur.y); await sleep(8); }
+      const dx = mode === 'serveflickside' ? 0.022 : 0, dy = mode === 'serveflick' ? 0.022 : mode === 'serveflickdown' ? -0.022 : 0;
+      for (let k = 1; k <= 4; k++) { P.setTarget(cur.x + dx * k, cur.y + dy * k); await sleep(8); }
       D.hooks.release();
       await until(() => G.hits > hits0 || !G.ballLive, 3000);
       const h = G.hitLog[G.hitLog.length - 1];
-      const res = G.hits > hits0 ? `HIT ${h.q}/${h.a}@${h.speed} spin ${h.spin},${h.wy},${h.wz} el${h.el}` : `NO CONTACT (${G.match.state})`;
+      const res = G.hits > hits0 ? `HIT ${h.q}/${h.a}@${h.speed} spin ${h.spin},${h.wy},${h.wz} (at contact ${h.spin0},${h.wy0}) el${h.el}` : `NO CONTACT (${G.match.state})`;
       await until(() => G.match.state !== 'IN_PLAY' && G.match.state !== 'TOSS', 8000);
-      return `${level.padEnd(6)} ${mode.padEnd(10)} ${res}`;
+      return `${level.padEnd(6)} ${mode.padEnd(14)} ${res}`;
     }
     if (!(await until(() => G.match.state === 'SERVE_WAIT', 12000))) return `${level} ${mode} off${off}: no serve wait (${G.match.state})`;
     G.match.server = 1;
