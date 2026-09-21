@@ -12,7 +12,7 @@
  * ball check on the table.
  */
 import * as THREE from 'three';
-import { TABLE, NET, BALL, FLOOR_Y, G, AIR, TABLE_PHYS, FLOOR_PHYS, RUBBER, clamp, lerp } from './consts.js?v=202609211848';
+import { TABLE, NET, BALL, FLOOR_Y, G, AIR, TABLE_PHYS, FLOOR_PHYS, RUBBER, clamp, lerp } from './consts.js?v=202609211910';
 
 const ZERO = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
@@ -52,7 +52,13 @@ export function airStep(b, h) {
   // lets go on the hitter's side once it has pushed the ball back through the plane
   if (b.netHold) {
     const dir = b.netHold, pen = b.p.z * dir;
-    if (pen < 0) { b.netHold = 0; v.z *= 0.6; }
+    if (pen < 0) {
+      // let go clear of the mesh on the side it came from, moving away, so it is never caught
+      // again from the other side and left sitting in the plane of the net
+      b.netHold = 0;
+      b.p.z = -dir * (BALL.R + 0.006); b.pPrev.z = b.p.z;
+      v.z = -dir * Math.max(0.25, Math.abs(v.z) * 0.6);
+    }
     else {
       const capped = Math.min(pen, NET.maxDepth);
       _a.z += -(NET.k / BALL.M) * capped * dir - (NET.c / BALL.M) * v.z;
@@ -225,7 +231,7 @@ export function collidePaddle(b, pad, ev, rnd, fa, fb) {
   const r = surfaceImpulse(b, _nb, vs, edge ? 0.45 : RUBBER.e, edge ? 0 : RUBBER.et, edge ? 0.3 : RUBBER.mu);
   b.p.copy(_pB).add(_off).addScaledVector(_nb, R + 0.002);
   b.pPrev.copy(b.p);
-  pad.cooldown = 0.05;
+  pad.cooldown = 0.2;                                        // longer than the rest of a swing: a blade never hits the same ball twice
   ev.push({
     type: 'paddle', owner: pad.owner, speedIn: r ? -r.vn : 0, edge, slip: !!(r && r.slip), rho: rho / Reff,
     point: b.p.clone(), normal: _nb.clone(), padSpeed: pad.vel.length(), brush: r ? r.brush : 0,

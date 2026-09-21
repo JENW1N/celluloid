@@ -7,7 +7,7 @@
  * so a fast flick at contact is a brush, and a brush is spin.
  */
 import * as THREE from 'three';
-import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609211848';
+import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609211910';
 
 const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3(), _t2 = new THREE.Vector2();
 
@@ -29,10 +29,13 @@ export class PlayerPaddle {
     this.brush = new THREE.Vector3();                      // the flick memory: the cursor's best recent motion, held then let go
     this.brushGain = PLAYER.brushGain;
     this.targetPrev = this.target.clone(); this.rawVel = new THREE.Vector3();
+    this.magnetShift = new THREE.Vector2();                // target motion that was not the player's (the serve magnet), left out of the flick
     this.pending = false; this.hold = 0; this.swingStarted = false;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); }
   nudge(dx, dy) { this.setTarget(this.target.x + dx, this.target.y + dy); }
+  /** The serve magnet moves the target toward the toss; that motion is not a flick. */
+  nudgeMagnet(dx, dy) { const x0 = this.target.x, y0 = this.target.y; this.setTarget(x0 + dx, y0 + dy); this.magnetShift.x += this.target.x - x0; this.magnetShift.y += this.target.y - y0; }
   startCharge() { if (this.charging || this.swingT >= 0) return false; this.charging = true; this.charge = 0; return true; }
   /** The blade speed a release at this charge would peak at. */
   peakFor(charge, maxPower = 1) { return SWING.vTap + (SWING.vFull - SWING.vTap) * Math.min(maxPower, Math.max(0.12, charge)); }
@@ -92,6 +95,7 @@ export class PlayerPaddle {
   }
   update(dt, ball = null, serving = false) {
     this.serving = serving;
+    this.brushGain = PLAYER.brushGain * (serving ? PLAYER.serveBrush : 1);
     const k = 1 - Math.exp(-28 * dt);
     _t2.copy(this.target).add(this.magnet);
     this.smooth.lerp(_t2, k);
@@ -116,8 +120,8 @@ export class PlayerPaddle {
     this.vel.copy(this.pos).sub(this.posPrev).divideScalar(Math.max(dt, 1e-4));
     // the flick memory follows the cursor itself (not the drift or the swing): a flick is kept at
     // its peak and fades over flickMemory seconds, so the brush at contact is the flick you made
-    this.rawVel.set((this.target.x - this.targetPrev.x) / Math.max(dt, 1e-4), (this.target.y - this.targetPrev.y) / Math.max(dt, 1e-4), 0);
-    this.targetPrev.copy(this.target);
+    this.rawVel.set((this.target.x - this.targetPrev.x - this.magnetShift.x) / Math.max(dt, 1e-4), (this.target.y - this.targetPrev.y - this.magnetShift.y) / Math.max(dt, 1e-4) * PLAYER.flickYGain, 0);
+    this.targetPrev.copy(this.target); this.magnetShift.set(0, 0);
     if (this.rawVel.lengthSq() >= this.brush.lengthSq()) this.brush.copy(this.rawVel);
     else this.brush.multiplyScalar(Math.exp(-dt / PLAYER.flickMemory));
     // the wrist: aim at the far side, close when high, open when low

@@ -5,7 +5,7 @@
  * cord, a ball into the net bellies it and it shudders back. The top tape is a separate spring.
  */
 import * as THREE from 'three';
-import { TABLE } from './consts.js?v=202609211848';
+import { TABLE } from './consts.js?v=202609211910';
 
 export class NetCloth {
   constructor(netInst) {

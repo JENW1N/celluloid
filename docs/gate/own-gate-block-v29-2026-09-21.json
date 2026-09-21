@@ -1,0 +1,133 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T19:12:14.832Z",
+  "desktop": true,
+  "level": "novice",
+  "style": "block",
+  "ready_s": 4.498,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 20.74,
+  "contacts": 17,
+  "longest_rally": 6,
+  "points": 7,
+  "score": [
+    4,
+    3
+  ],
+  "samples": 1459,
+  "log": [
+    "YOU NET r2 1-0",
+    "CPU OWN SIDE r5 1-1",
+    "YOU WINNER r2 2-1",
+    "CPU OUT r6 2-2",
+    "CPU OWN SIDE r5 2-3",
+    "YOU DOUBLE BOUNCE r3 3-3",
+    "YOU WINNER r2 4-3"
+  ],
+  "hits": [
+    "BLOCK/clean@4.4",
+    "BLOCK/assisted@4.5",
+    "BLOCK/assisted@4.2",
+    "BLOCK/none@4.5(in4.5 el1.4 z1.6 y0.91)",
+    "S:GOOD/assisted@7.5",
+    "BLOCK/assisted@5.6",
+    "S:GOOD/assisted@7.5",
+    "BLOCK/assisted@4",
+    "BLOCK/assisted@4.5",
+    "BLOCK/none@3.2(in3.2 el1.269 z1.58 y0.95)",
+    "BLOCK/assisted@4.8",
+    "BLOCK/assisted@5.3",
+    "BLOCK/none@3.8(in3.8 el1.056 z1.59 y0.92)",
+    "BLOCK/assisted@4.3",
+    "BLOCK/assisted@4.8",
+    "S:GOOD/assisted@7.5",
+    "BLOCK/assisted@4.5"
+  ],
+  "final": {
+    "pos": [
+      -0.000889377575149552,
+      0.9230087775818059
+    ],
+    "fps": 240,
+    "speed": 1.2167469664016617,
+    "score": [
+      4,
+      3
+    ],
+    "over": false,
+    "draws": 211,
+    "tris": 138960,
+    "rally": 0,
+    "hits": 17,
+    "state": "PLAY",
+    "ball": [
+      0.17869342589720522,
+      0.027976262243329653,
+      -2.6152171046808332
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        634.926926341331,
+        592.0010680098939
+      ],
+      "pxPerM": [
+        414.4123897321856,
+        -353.0176414982145
+      ]
+    },
+    "points": 7,
+    "ballv": [
+      0.0854293379364704,
+      0.6285325309485468,
+      -1.0383264737098814
+    ],
+    "spin": 52.054228295163746,
+    "level": "novice",
+    "server": 0,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      0,
+      "WINNER",
+      2
+    ],
+    "lastHit": {
+      "q": "BLOCK",
+      "a": "assisted",
+      "serve": false,
+      "before": 2.6,
+      "speed": 4.5,
+      "el": 0.75,
+      "spin": -32,
+      "wy": 2,
+      "wz": -3,
+      "z": 1.59,
+      "y": 1.22,
+      "pad": 0,
+      "swingT": -1,
+      "phase": 0,
+      "pend": false,
+      "sinceSwing": null,
+      "auto": null,
+      "hold": null,
+      "tReal": null
+    },
+    "slow": []
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.628,
+    10.097,
+    17.608,
+    25.102,
+    32.63,
+    40.107,
+    47.598,
+    55.091
+  ],
+  "fails": [],
+  "result": "PASS"
+}

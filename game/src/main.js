@@ -6,18 +6,18 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609211848';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211848';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211848';
-import { PlayerPaddle } from './player.js?v=202609211848';
-import { Input } from './input.js?v=202609211848';
-import { Match } from './rules.js?v=202609211848';
-import { Bot } from './bots.js?v=202609211848';
-import { AudioEngine } from './audio.js?v=202609211848';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609211848';
-import { NetCloth } from './netcloth.js?v=202609211848';
-import { buildArena, ASSET_LIST } from './arena.js?v=202609211848';
-import { UI } from './ui.js?v=202609211848';
+import { preloadAssets } from '../assetlib.js?v=202609211910';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609211910';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609211910';
+import { PlayerPaddle } from './player.js?v=202609211910';
+import { Input } from './input.js?v=202609211910';
+import { Match } from './rules.js?v=202609211910';
+import { Bot } from './bots.js?v=202609211910';
+import { AudioEngine } from './audio.js?v=202609211910';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609211910';
+import { NetCloth } from './netcloth.js?v=202609211910';
+import { buildArena, ASSET_LIST } from './arena.js?v=202609211910';
+import { UI } from './ui.js?v=202609211910';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -283,7 +283,7 @@ function update(dt, now, realDt) {
   if (serving && G.ballLive) {
     // the blade is drawn to the tossed ball, and the top of the toss is called out
     const dx = ball.p.x - paddle.target.x, dy = ball.p.y - paddle.target.y;
-    if (Math.abs(dx) < 0.2 && Math.abs(dy) < 0.24) paddle.setTarget(paddle.target.x + dx * 0.65, paddle.target.y + dy * 0.65);
+    if (Math.abs(dx) < 0.2 && Math.abs(dy) < 0.24) paddle.nudgeMagnet(dx * 0.65, dy * 0.65);
     if (!G.apexCued && ball.v.y < 0.35) { G.apexCued = true; G.audio.tick(); G.ballVis.flash(); }
   } else G.apexCued = false;
   // leeway: where the ball will cross the blade's plane, how soon, and what the level makes of it
@@ -452,17 +452,19 @@ function applyAssistInner(isServe) {
   // where a shot ends, as a sign: below zero it needs more height (net, own side, too close to
   // the net), above zero less (long, wide, the edge), zero when it lands well inside the lines
   const judge = (state) => {
-    const r = predict(state, { h: 1 / 360, maxT: 1.8, ev: _evA, until: (bb, t, ev) => countType(ev, 'table') >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
+    // a serve is judged at the live step with wider margins: it is slow, it bounces twice, and
+    // a millimetre at the first bounce is a centimetre at the net
+    const r = predict(state, { h: isServe ? 1 / 600 : 1 / 360, maxT: isServe ? 2.2 : 1.8, ev: _evA, until: (bb, t, ev) => countType(ev, 'table') >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
     const ev = r.events;
-    if (ev.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip' || (x.type === 'nearmiss' && x.clearance < 0.012))) return -1;
+    if (ev.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip' || (x.type === 'nearmiss' && x.clearance < (isServe ? 0.025 : 0.012)))) return -1;
     const tables = ev.filter((x) => x.type === 'table');
     if (tables.length < 1) return r.state.p.z > 0 ? -1 : 1;    // never got past the net: more height; over everything: less
     let land;
     if (isServe) {
       const first = tables[0];
       if (first.side !== 0) return 1;                          // no bounce on the server's side: too far
-      if (first.z >= halfL - 0.1) return -1;                   // down almost on the end line: too steep
-      if (first.z <= 0.25) return 1;                           // bounced up against the net: too far
+      if (first.z >= halfL - 0.15) return -1;                  // down almost on the end line: too steep
+      if (first.z <= 0.35) return 1;                           // bounced up against the net: too far
       if (tables.length < 2) return 1;                         // over the far end after the bounce
       land = tables[1];
       if (land.side !== 1) return -1;                          // twice on the server's side: too slow
@@ -470,9 +472,10 @@ function applyAssistInner(isServe) {
       land = tables[0];
       if (land.side !== 1) return -1;                          // own side
     }
-    if (land.z > -0.12) return -1;                             // too close to the net
-    if (Math.abs(land.x) > halfW - 0.06) { wideSeen = true; return 1; }
-    if (land.z < -halfL + 0.14 || land.edge) return 1;
+    const mz = isServe ? 0.2 : 0.12, mx = isServe ? 0.1 : 0.06, me = isServe ? 0.2 : 0.14;
+    if (land.z > -mz) return -1;                               // too close to the net
+    if (Math.abs(land.x) > halfW - mx) { wideSeen = true; return 1; }
+    if (land.z < -halfL + me || land.edge) return 1;
     return 0;
   };
   let o0 = judge(b);
@@ -496,16 +499,17 @@ function applyAssistInner(isServe) {
   // ball popped up may be brought down to a drive: the window is relative to the shot as hit,
   // these two are the absolute ends the lower levels may always reach
   const hiMax = slow ? Math.max(th0 + maxA, 0.62) : th0 + maxA;
-  const loMin = !isServe && cfg.assistAngle >= 0.15 ? Math.min(th0 - maxA, 0.04) : th0 - maxA;
+  const loMin = !isServe && cfg.assistAngle >= 0.15 ? Math.min(th0 - maxA, 0.04) : isServe ? Math.min(th0 - maxA, -0.15) : th0 - maxA;
   const spinMax = A.spin || 0, paceMin = A.pace || 0.95, paceMax = slow ? boost : (isServe ? 1.25 : 1);
   const topspinSign = b.v.z < 0 ? -1 : 1;                    // topspin for a ball travelling -z is negative x
   let ux = b.v.x / hl, uz = b.v.z / hl;
   const trial = new BallState();
-  let budget = 100;
+  let budget = 100, wScale = 1;
   const at = (th, s, dw) => {
     budget--;
     trial.copy(b);
     trial.v.set(s * Math.cos(th) * ux, s * Math.sin(th), s * Math.cos(th) * uz);
+    trial.w.multiplyScalar(wScale);
     trial.w.x += topspinSign * dw;
     return judge(trial);
   };
@@ -614,6 +618,16 @@ function applyAssistInner(isServe) {
       if (res === 'assisted') return res;
     }
   }
+  // spin so heavy nothing lands it: keep the stroke, take some of the spin off, look again
+  if (res === 'none' && b.w.lengthSq() > 250 * 250) {
+    for (const ws of [0.5, 0.25]) {
+      wScale = ws; budget = 40; wideSeen = false;
+      o0 = at(th0, speed, 0);
+      if (o0 === 0) return commit();
+      res = run();
+      if (res === 'assisted') return res;
+    }
+  }
   return res;
 }
 
@@ -638,6 +652,15 @@ function handleEvent(e, now) {
       if (isPlayer && e.edge) { G.hitLog.push({ q: 'EDGE', a: '-', serve: !!(res && res.serve !== undefined), speed: +G.ball.v.length().toFixed(1), rho: +e.rho.toFixed(2) }); if (G.hitLog.length > 40) G.hitLog.shift(); }
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
         const before = G.ball.v.length();
+        if (res && res.serve !== undefined) {
+          // a brushed toss can be dragged along the face into a drive: a serve keeps its spin,
+          // within reason, but never its pace
+          const sp = G.ball.v.length(); if (sp > SERVE.maxSpeed) G.ball.v.multiplyScalar(SERVE.maxSpeed / sp);
+          const wl = G.ball.w.length(); if (wl > SERVE.maxSpin) G.ball.w.multiplyScalar(SERVE.maxSpin / wl);
+          // nor is it lifted: a brush drags the ball up the face, the launch stays a serve's
+          const v = G.ball.v, hzl = Math.hypot(v.x, v.z), elv = Math.atan2(v.y, hzl);
+          if (elv > SERVE.maxEl && hzl > 0.1) { const s2 = v.length(); v.y = s2 * Math.sin(SERVE.maxEl); const f = s2 * Math.cos(SERVE.maxEl) / hzl; v.x *= f; v.z *= f; }
+        }
         const a = applyAssist(!!(res && res.serve !== undefined));
         if (a === 'assisted' && q === 'PERFECT') q = 'GOOD';
         computeReachLater();
@@ -852,5 +875,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609211848';
+import { solveShot } from './bots.js?v=202609211910';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };
