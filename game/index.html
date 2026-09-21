@@ -45,7 +45,7 @@
   .btn.big { padding:18px 52px; background:var(--cyan); color:var(--ink); border-color:var(--cyan); font-size:16px; }
   .btn.big:hover { background:#8df0ff; color:var(--ink); }
   .row { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .lv { min-width:118px; }
+  .lv { min-width:104px; padding:12px 16px; }
   .lv small { display:block; font-size:9px; letter-spacing:.18em; color:#6b7390; margin-top:4px; }
   .lv.sel small { color:var(--cyan); }
   kbd { border:1px solid #3a4262; padding:1px 6px; border-radius:2px; color:#c9d0e6; font-size:11px; font-family:inherit; }
@@ -56,12 +56,14 @@
   #ui { position:fixed; inset:0; pointer-events:none; z-index:20; }
   #hud { position:absolute; inset:0; display:none; }
   #hud.on { display:block; }
-  #bug { position:absolute; top:calc(var(--sat) + 10px); left:50%; transform:translateX(-50%); display:flex; align-items:stretch; height:44px;
-         background:rgba(8,10,20,.82); border:1px solid rgba(255,255,255,.08); border-bottom:2px solid var(--cyan); border-radius:3px; overflow:hidden; }
-  #bug .name { display:flex; align-items:center; padding:0 14px; font-size:12px; font-weight:800; letter-spacing:.2em; color:#c9d0e6; min-width:88px; justify-content:center; }
-  #bug .name.you { background:rgba(79,227,255,.10); }
-  #bug .name.cpu { background:rgba(255,122,48,.10); }
-  #bug .num { position:relative; width:46px; overflow:hidden; font-size:26px; font-weight:900; font-variant-numeric:tabular-nums; }
+  #bug { position:absolute; top:calc(var(--sat) + 12px); left:50%; transform:translateX(-50%); display:flex; align-items:center; height:40px; padding:0 8px;
+         background:rgba(8,10,20,.72); border:1px solid rgba(255,255,255,.07); border-radius:20px; }
+  #bug .side { display:flex; align-items:center; gap:8px; padding:0 6px; }
+  #bug .name { font-size:10px; font-weight:700; letter-spacing:.24em; color:rgba(242,242,238,.55); text-indent:.24em; }
+  #bug .side.you .name { color:var(--cyan); }
+  #bug .side.cpu .name { color:var(--orange); }
+  #bug .mid { width:1px; height:20px; background:rgba(255,255,255,.14); margin:0 4px; }
+  #bug .num { position:relative; width:34px; height:30px; overflow:hidden; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; color:#f2f2ee; }
   #bug .num span { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
   #bug .num span.out { animation:numOut .36s cubic-bezier(.3,.7,.2,1) forwards; }
   #bug .num span.in { animation:numIn .46s cubic-bezier(.34,1.56,.64,1) forwards; }
@@ -69,10 +71,8 @@
   @keyframes numOut { to { transform:translateY(-110%); opacity:0; } }
   @keyframes numIn { from { transform:translateY(110%); } 70% { transform:translateY(-6%) scale(1.06); } to { transform:translateY(0) scale(1); } }
   @keyframes wonBar { from { opacity:1; } to { opacity:0; } }
-  #bug .dots { display:flex; flex-direction:column; justify-content:center; gap:4px; padding:0 4px; }
-  #bug .dot { width:5px; height:5px; border-radius:50%; background:#2b3352; }
-  #bug .dot.on { background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
-  #bug .sep { display:flex; align-items:center; color:#3a4262; font-size:18px; padding:0 2px; }
+  #bug .dot { width:5px; height:5px; border-radius:50%; background:transparent; }
+  #bug .dot.on { background:#fff; box-shadow:0 0 6px #fff; }
   #gp { position:absolute; top:calc(var(--sat) + 60px); left:50%; transform:translateX(-50%); font-size:10px; letter-spacing:.34em; text-indent:.34em; color:var(--orange); opacity:0; transition:opacity .4s; }
   #gp.on { opacity:1; animation:gpPulse 1.6s ease-in-out infinite; }
   @keyframes gpPulse { 50% { opacity:.45; } }
@@ -127,11 +127,9 @@
 <div id="ui">
   <div id="hud">
     <div id="bug">
-      <div class="name you">YOU</div>
-      <div class="num" id="s0"><span class="cur">0</span></div>
-      <div class="dots"><div class="dot" id="d0"></div><div class="dot" id="d1"></div></div>
-      <div class="num" id="s1"><span class="cur">0</span></div>
-      <div class="name cpu" id="cpuname">ROOKIE</div>
+      <div class="side you"><div class="name">YOU</div><div class="num" id="s0"><span class="cur">0</span></div><i class="dot" id="d0"></i></div>
+      <div class="mid"></div>
+      <div class="side cpu"><i class="dot" id="d1"></i><div class="num" id="s1"><span class="cur">0</span></div><div class="name" id="cpuname">ROOKIE</div></div>
     </div>
     <div id="gp"></div>
     <div id="rally"></div>
@@ -156,12 +154,13 @@
   <div class="sub">table tennis</div>
   <h2>CELLULOID</h2>
   <div class="row">
-    <button class="btn lv pe sel" data-level="rookie">ROOKIE<small>blocks and pushes</small></button>
+    <button class="btn lv pe sel" data-level="novice">NOVICE<small>lobs it back</small></button>
+    <button class="btn lv pe" data-level="rookie">ROOKIE<small>blocks and pushes</small></button>
     <button class="btn lv pe" data-level="club">CLUB<small>loops the corners</small></button>
     <button class="btn lv pe" data-level="pro">PRO<small>takes it on the rise</small></button>
   </div>
   <button class="btn big pe" id="startb">PLAY</button>
-  <p id="hint-desktop">the paddle is your cursor · <kbd>hold click</kbd> charges, release swings · flick at contact for spin<br>your serve: <kbd>hold click</kbd> tosses and charges, release at the top of the toss · <kbd>←</kbd> <kbd>→</kbd> place the toss · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> opponent · <kbd>M</kbd> mute</p>
+  <p id="hint-desktop">the paddle is your cursor · <kbd>hold click</kbd> charges, release swings · flick at contact for spin<br>your serve: <kbd>hold click</kbd> tosses and charges, release at the top of the toss · <kbd>←</kbd> <kbd>→</kbd> place the toss · <kbd>1</kbd> to <kbd>4</kbd> opponent · <kbd>M</kbd> mute</p>
   <p id="hint-touch">one finger drags the paddle · a second finger held charges, lifted swings · flick at contact for spin<br>hold TOSS to toss and charge, lift at the top of the toss</p>
   <p><small>first to 11, two clear · CPU serves first</small></p>
 </div>

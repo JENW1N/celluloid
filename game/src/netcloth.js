@@ -52,22 +52,27 @@ export class NetCloth {
   }
   update(dt) {
     if (!this.cloth) return;
-    const h = Math.min(dt, 1 / 30);
-    this.t += h;
+    // fixed sub-steps: the springs are stiff enough that a frame's worth of time in one step
+    // diverges at low frame rates, and a net that has exploded into a hammock is worse than
+    // no net at all
+    const H = 1 / 120, n = Math.min(6, Math.max(1, Math.round(dt / H)));
     const pos = this.pos, prev = this.prev, base = this.base, cols = this.cols, rows = this.rows;
-    let energy = 0;
-    for (let iy = 1; iy < rows; iy++) for (let ix = 1; ix < cols - 1; ix++) {
-      const i = (iy * cols + ix) * 3 + 2;
-      const z = pos[i], vz = (z - prev[i]) * 0.978;
-      const nb = (pos[i - 3] + pos[i + 3] + pos[i - cols * 3] + (iy < rows - 1 ? pos[i + cols * 3] : z)) * 0.25;
-      // a breath of air moves the mesh all the time, more toward the bottom, so it is never rigid
-      const sag = iy / (rows - 1);
-      const wind = 0.9 * sag * Math.sin(this.t * 1.7 + base[i - 2] * 3.1) + 0.5 * sag * Math.sin(this.t * 2.9 - base[i - 2] * 5.3);
-      const acc = 140 * (base[i] - z) + 1100 * (nb - z) + wind;
-      prev[i] = z;
-      pos[i] = z + vz + acc * h * h;
-      energy += Math.abs(vz) + Math.abs(pos[i] - base[i]);
+    for (let step = 0; step < n; step++) {
+      this.t += H;
+      for (let iy = 1; iy < rows; iy++) for (let ix = 1; ix < cols - 1; ix++) {
+        const i = (iy * cols + ix) * 3 + 2;
+        const z = pos[i], vz = (z - prev[i]) * 0.985;
+        const nb = (pos[i - 3] + pos[i + 3] + pos[i - cols * 3] + (iy < rows - 1 ? pos[i + cols * 3] : z)) * 0.25;
+        // a breath of air moves the mesh all the time, more toward the bottom, so it is never rigid
+        const sag = iy / (rows - 1);
+        const wind = 0.5 * sag * Math.sin(this.t * 1.7 + base[i - 2] * 3.1) + 0.3 * sag * Math.sin(this.t * 2.9 - base[i - 2] * 5.3);
+        const acc = 140 * (base[i] - z) + 700 * (nb - z) + wind;
+        prev[i] = z;
+        pos[i] = Math.max(-0.16, Math.min(0.16, z + vz + acc * H * H));
+      }
     }
+    const h = H;
+    let energy = 0;
     if (this.pressing) {
       const { x, y, dir, depth } = this.pressing, r = 0.11;
       for (let i = 0; i < this.n; i++) {

@@ -87,6 +87,7 @@ export class BallVisual {
     this.squash = 0; this.sqA = 0; this.sqT = 9; this.axis = new THREE.Vector3(0, 1, 0);
     this.spinColor = new THREE.Color(0xffffff);
     this.haloAngle = 0; this.flashT = 0;
+    this.spinQ = new THREE.Quaternion();
   }
   /** A white pop of the halo: the timing cue at the top of a toss. */
   flash() { this.flashT = 0.25; }
@@ -118,13 +119,15 @@ export class BallVisual {
     this.xray.lookAt(this.camera.position);
     this.xray.visible = visible && ball.p.z > 0.9;
     this.xray.material.opacity = 0.55 + 0.2 * Math.sin(now * 14);
-    // spin: real axis, capped visual rate so direction reads instead of strobing
+    // spin: real axis, capped visual rate so direction reads instead of strobing. The spin is
+    // kept as our own unit quaternion: reading it back from a world matrix that carries the
+    // squash's non-uniform scale shears the axis, the quaternion drifts off unit length, and a
+    // non-unit quaternion turns the sphere into a disc that never recovers.
     const ws = ball.w.length();
     if (ws > 1) {
       _a.copy(ball.w).divideScalar(ws);
-      this.spinG.getWorldQuaternion(_q).invert();
-      _b.copy(_a).applyQuaternion(_q);
-      this.spinG.rotateOnAxis(_b, Math.min(ws, 28) * dt);
+      _q.setFromAxisAngle(_a, Math.min(ws, 28) * dt);
+      this.spinQ.premultiply(_q).normalize();
     }
     // squash: a closed-form damped wobble, stable at any frame rate
     this.sqT += dt;
@@ -140,6 +143,7 @@ export class BallVisual {
       this.squashG.quaternion.setFromUnitVectors(Z, _a);
       this.squashG.scale.set(1 - stretch * 0.4, 1 - stretch * 0.4, 1 + stretch);
     } else { this.squashG.quaternion.identity(); this.squashG.scale.set(1, 1, 1); }
+    this.spinG.quaternion.copy(this.squashG.quaternion).invert().multiply(this.spinQ).normalize();
     // halo: perpendicular to the spin axis, brighter with spin
     const col = this.colorFor(ball.w, ball.v);
     this.spinColor.lerp(col, 1 - Math.exp(-10 * dt));

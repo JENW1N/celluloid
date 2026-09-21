@@ -37,6 +37,7 @@ export class UI {
     setTimeout(() => old.remove(), 600);
   }
   setScore(score, server, animate = true) {
+    if (this.onScore) this.onScore(score[0], score[1]);
     if (!animate) { this.e.s0.querySelector('.cur').textContent = score[0]; this.e.s1.querySelector('.cur').textContent = score[1]; }
     else { this.digit(this.e.s0, score[0]); this.digit(this.e.s1, score[1]); }
     this.e.d0.classList.toggle('on', server === 0); this.e.d1.classList.toggle('on', server === 1);

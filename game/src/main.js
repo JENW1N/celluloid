@@ -35,7 +35,7 @@ const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3
 const _ray = new THREE.Raycaster();
 
 const G = {
-  ball: new BallState(), paddle: new PlayerPaddle(), match: new Match(), bot: null, level: 'rookie',
+  ball: new BallState(), paddle: new PlayerPaddle(), match: new Match(), bot: null, level: 'novice',
   audio: new AudioEngine(), ui: new UI(), input: null, arena: null, ballVis: null, fx: null, cloth: null,
   serveX: 0, events: [], time: 0, running: false, ballLive: false, reachZ: null, touch: false,
   camBase: new THREE.Vector3(0, 1.85, 3.4), lookBase: new THREE.Vector3(0, 0.7, -0.35), look: new THREE.Vector3(0, 0.7, -0.35), fovBase: 48,
@@ -71,6 +71,7 @@ async function boot() {
   G.ui.setTouch(G.input.touch);
   wireButtons();
   G.ui.setLevel(G.level, LEVELS[G.level].name);
+  G.ui.onScore = (a, b) => G.arena.setScore && G.arena.setScore(a, b);
   G.ui.setScore([0, 0], -1, false);
   resize();
   window.addEventListener('resize', resize);
@@ -347,31 +348,62 @@ function applyAssist(isServe) {
   if (legal(b)) return 'clean';
   const speed = b.v.length();
   if (speed < 0.8) return 'none';
-  const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl), ph0 = Math.atan2(b.v.x, b.v.z);
+  const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl);
+  if (hl < 0.3) return 'none';
   // a slow ball carries no skill premium: below 7 m/s the lower levels may bend it further, and
   // push it a little harder, so a block met low becomes a lob instead of a pop-up
   const slow = !isServe && speed < 7 && cfg.assistAngle >= 0.15;
   const A = isServe ? SERVE.assist : { angle: cfg.assistAngle, pace: cfg.assistPace, spin: cfg.assistSpin };
   const maxA = slow ? Math.max(A.angle, 0.55) : A.angle;
-  // candidates: a little elevation, a little less pace, a touch of the topspin a real stroke
-  // would have brushed on, and a nudge of direction. Cheapest change that lands wins.
-  const spinMax = A.spin || 0;
-  const cand = [];
-  const ths = [0, 0.015, -0.015, 0.03, -0.03, 0.05, -0.05, 0.08, -0.08, 0.12, -0.12, 0.17, -0.17, 0.23, -0.23, 0.3, -0.3, 0.4, -0.4, 0.55, -0.55].filter((d) => Math.abs(d) <= maxA + 1e-6);
-  const spins = [0, 120, 260, 420].filter((w) => w <= spinMax + 1e-6);
-  const sfs = [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.5, 1.08].filter((f) => f >= (A.pace || 0.95) - 1e-6);
-  if (slow) sfs.push(1.25, 1.45, 1.7);
-  for (const dth of ths) for (const dw of spins) for (const sf of sfs) if (dth !== 0 || dw !== 0 || sf !== 1) cand.push({ dth, dph: 0, dw, sf, cost: Math.abs(dth) + dw * 0.0003 + Math.abs(1 - sf) * 0.5 });
-  for (const dph of [0.05, -0.05, 0.1, -0.1]) if (Math.abs(dph) <= maxA + 1e-6) for (const dth of [0, 0.05, -0.05]) cand.push({ dth, dph, dw: 0, sf: 1, cost: Math.abs(dth) + Math.abs(dph) });
-  cand.sort((x, y) => x.cost - y.cost);
+  // For each pace and spin worth trying, bisect the elevation on the along-track landing error
+  // (short, net and own-side negative; long positive), which is close to monotone, and keep the
+  // first that lands inside the lines. About a dozen simulations, not hundreds, so no hitch.
+  const spinMax = A.spin || 0, paceMin = A.pace || 0.95;
+  const topspinSign = b.v.z < 0 ? -1 : 1;                  // topspin for a ball travelling -z is negative x
+  const ux = b.v.x / hl, uz = b.v.z / hl;
+  const zTarget = isServe ? -0.7 : -0.72;                  // where we would like the far bounce
+  const alongTarget = (zTarget - b.p.z) / uz;
   const trial = new BallState();
-  const topspinSign = b.v.z < 0 ? -1 : 1;     // topspin for a ball travelling -z is negative x
-  for (const c of cand) {
-    const th = th0 + c.dth, ph = ph0 + c.dph, s = speed * c.sf;
+  const err = (th, s, dw) => {
     trial.copy(b);
-    trial.v.set(s * Math.cos(th) * Math.sin(ph), s * Math.sin(th), s * Math.cos(th) * Math.cos(ph));
-    trial.w.x += topspinSign * c.dw;
-    if (legal(trial)) { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; }
+    trial.v.set(s * Math.cos(th) * ux, s * Math.sin(th), s * Math.cos(th) * uz);
+    trial.w.x += topspinSign * dw;
+    const r = predict(trial, { h: 1 / 400, maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
+    const ev = r.events.filter((x) => x.type !== 'nearmiss');
+    // a landing that skimmed the tape counts as short, so the search settles on the lowest
+    // trajectory that clears the net with room to spare rather than on the clip boundary
+    const nm = r.events.find((x) => x.type === 'nearmiss');
+    const tight = !!(nm && nm.clearance < 0.022);
+    const along = (e) => (tight ? -0.35 : (e.x - b.p.x) * ux + (e.z - b.p.z) * uz - alongTarget);
+    if (!isServe) {
+      const e = ev[0];
+      if (!e) return 1;
+      if (e.type === 'table') return e.side === 1 ? along(e) : -1;
+      if (e.type === 'floor' || e.type === 'ceiling') return 1;
+      return -0.6;
+    }
+    const first = ev[0];
+    if (!first) return 1;
+    if (first.type !== 'table' || first.side !== 0) return first.type === 'table' ? 1 : (first.type === 'floor' ? 1 : 0.8);
+    const second = ev[1];
+    if (!second) return 1;
+    if (second.type === 'table') return second.side === 1 ? along(second) : -1;
+    if (second.type === 'floor' || second.type === 'ceiling') return 1;
+    return -0.6;
+  };
+  const combos = [[1, 0], [0.9, 0], [1, 130], [0.8, 0], [0.9, 260], [0.7, 0], [0.6, 0], [0.5, 0], [1.2, 0], [1.45, 0]]
+    .filter(([sf, dw]) => sf >= paceMin - 1e-6 && dw <= spinMax + 1e-6 && (sf <= 1 || slow));
+  for (const [sf, dw] of combos) {
+    const s = speed * sf;
+    let lo = th0 - maxA, hi = th0 + maxA, elo = err(lo, s, dw), ehi = err(hi, s, dw);
+    if (!(elo < 0 && ehi > 0)) continue;
+    for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2, e = err(mid, s, dw); if (e < 0) { lo = mid; elo = e; } else { hi = mid; ehi = e; } }
+    for (const th of [hi, lo]) {
+      trial.copy(b);
+      trial.v.set(s * Math.cos(th) * ux, s * Math.sin(th), s * Math.cos(th) * uz);
+      trial.w.x += topspinSign * dw;
+      if (legal(trial)) { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; }
+    }
   }
   return 'none';
 }
@@ -600,4 +632,4 @@ boot().catch((err) => { console.warn('[celluloid] boot failed', err); G.ui.loadi
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
 import { solveShot } from './bots.js';
-window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER };
+window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist };

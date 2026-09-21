@@ -8,7 +8,7 @@ import { ASSET } from '../assetlib.js';
 import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js';
 import { TABLE, PALETTE, clamp } from './consts.js';
 
-export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'scoreboard_flip', 'ball_bucket', 'towel_box'];
+export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'scoreboard_flip', 'ball_bucket', 'towel_box'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
@@ -270,6 +270,35 @@ export async function buildArena(scene, { phone = false } = {}) {
   await setPiece('towel_box', 2.45, 0, 2.05, 0.2, 0.003);
   await setPiece('towel_box', -2.45, 0, -2.05, -0.3, 0.003);
 
+  // the score, lit in segments: a big unit over the far stand, a small one on the umpire's table
+  const PATTERNS = { 0: 'abcdef', 1: 'bc', 2: 'abged', 3: 'abgcd', 4: 'fgbc', 5: 'afgcd', 6: 'afgedc', 7: 'abc', 8: 'abcdefg', 9: 'abcdfg' };
+  const litL = toonMaterial(new THREE.MeshStandardMaterial({ color: 0x4fe3ff, name: 'plaster' })); litL.emissive.setHex(0x4fe3ff); litL.emissiveIntensity = 0.9;
+  const litR = toonMaterial(new THREE.MeshStandardMaterial({ color: 0xff7a30, name: 'plaster' })); litR.emissive.setHex(0xff7a30); litR.emissiveIntensity = 0.9;
+  const displays = [];
+  const makeDisplay = async (x, y, z, ry, scale) => {
+    const d = toonify(await ASSET('./assets/score_display.js', { keepHierarchy: true }), { outline: 0.004 });
+    d.position.set(x, y, z); d.rotation.y = ry; d.scale.setScalar(scale);
+    scene.add(d);
+    if (d.userData.segments) { displays.push(d.userData.segments); for (const k of Object.keys(d.userData.segments)) { const m = d.userData.segments[k]; m.userData.dark = m.material; } }
+  };
+  await makeDisplay(0, 4.6, -11.6, 0, 2.2);
+  await makeDisplay(2.95, TABLE.H, 0.78, 0, 0.3);
+  out.setScore = (a, b) => {
+    const show = (segs, key, value, lit, blankLeading) => {
+      const tens = Math.floor(value / 10) % 10, ones = value % 10;
+      const pat1 = blankLeading && tens === 0 ? '' : PATTERNS[tens], pat0 = PATTERNS[ones];
+      for (const s of 'abcdefg') {
+        const m1 = segs[key + '1' + s], m0 = segs[key + '0' + s];
+        if (m1) { const on = pat1.includes(s); m1.visible = true; m1.material = on ? lit : m1.userData.dark; }
+        if (m0) { const on = pat0.includes(s); m0.visible = true; m0.material = on ? lit : m0.userData.dark; }
+      }
+    };
+    for (const segs of displays) {
+      show(segs, 'l', a, litL, true); show(segs, 'r', b, litR, true);
+      if (segs.colon0) segs.colon0.material = litL; if (segs.colon1) segs.colon1.material = litR;
+    }
+  };
+  out.setScore(0, 0);
   out.setLevel = (lvl) => { const k = 0.15 + 0.9 * clamp(lvl, 0, 1); for (const m of out.banners) m.emissiveIntensity = k; };
   return out;
 }

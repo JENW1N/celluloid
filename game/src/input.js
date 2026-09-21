@@ -12,7 +12,7 @@
 import { PLAYER } from './consts.js';
 
 /** Some drivers send key without code; take either. */
-const KEYS = { w: 'KeyW', r: 'KeyR', m: 'KeyM', ' ': 'Space', 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', escape: 'Escape' };
+const KEYS = { w: 'KeyW', r: 'KeyR', m: 'KeyM', ' ': 'Space', 1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight', escape: 'Escape' };
 function keyCode(e) {
   if (e.code) return e.code;
   const k = String(e.key || '');
@@ -60,9 +60,10 @@ export class Input {
       switch (code) {
         case 'KeyW': h.toss(); break;
         case 'Space': e.preventDefault(); h.chargeStart(); break;
-        case 'Digit1': h.level('rookie'); break;
-        case 'Digit2': h.level('club'); break;
-        case 'Digit3': h.level('pro'); break;
+        case 'Digit1': h.level('novice'); break;
+        case 'Digit2': h.level('rookie'); break;
+        case 'Digit3': h.level('club'); break;
+        case 'Digit4': h.level('pro'); break;
         case 'KeyR': h.restart(); break;
         case 'KeyM': h.mute(); break;
         case 'Escape': h.menu(); break;
