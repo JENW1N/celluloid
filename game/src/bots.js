@@ -208,7 +208,6 @@ export class Bot {
     if (this.servePhase !== 'toss' || this.serveT < 0.27) return;
     this.servePhase = 'hit';
     const sol = this.solveServe(ball.p);
-    if (!sol) return;                                   // it drops; the rules call the toss failed
     const speedIn = ball.v.length();
     ball.set(ball.p, sol.v, sol.w);
     ev.push({ type: 'paddle', owner: 1, serve: true, speedIn, edge: false, slip: false, rho: 0.2, point: ball.p.clone(), normal: sol.v.clone().normalize(), padSpeed: sol.v.length() * 0.7, brush: 0, spin: sol.w.length(), speedOut: sol.v.length(), quality: 'GOOD', kind: 'serve' });
@@ -221,18 +220,26 @@ export class Bot {
     const w = new THREE.Vector3(-spinMag * rr(0.3, 1), (Math.random() < 0.5 ? -1 : 1) * spinMag * rr(0, 0.8), 0);
     const tx = rr(-0.45, 0.45), tz2 = rr(0.5, 1.15);
     const base = rr(cfg.serveSpd[0], cfg.serveSpd[1]);
-    let best = null;
-    for (const z1 of [-1.05, -0.92, -0.8, -0.68, -0.55, -0.42]) for (const f of [0.6, 0.72, 0.85, 1.0, 1.15, 1.32, 1.5]) {
+    let best = null, fallback = null;
+    for (const z1 of [-1.1, -0.98, -0.86, -0.74, -0.62, -0.5, -0.4]) for (const f of [0.6, 0.72, 0.85, 1.0, 1.15, 1.32, 1.5, 1.7, 1.9]) {
       const spd = base * f;
       _d.set(tx * 0.5 - P.x, TABLE.H + BALL.R - P.y, z1 - P.z).normalize();
       _b.set(P, _v.copy(_d).multiplyScalar(spd), w);
       const r = predict(_b, { maxT: 2.5, until: (b, t, ev) => ev.filter((x) => x.type === 'table').length >= 2 || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'netclip') });
       const tables = r.events.filter((e) => e.type === 'table');
-      if (tables.length < 2 || tables[0].side !== 1 || tables[1].side !== 0) continue;
+      if (!tables.length || tables[0].side !== 1) continue;
+      // bounced on our side at least: the nearest thing to a serve, kept in case nothing is clean
+      const far = tables[1] && tables[1].side === 0 ? Math.abs(tables[1].z - tz2) : 2;
+      if (!fallback || far < fallback.score) fallback = { score: far, v: _v.clone(), w: w.clone() };
+      if (tables.length < 2 || tables[1].side !== 0) continue;
       if (r.events.some((e) => e.type === 'netclip')) continue;
       const score = Math.abs(tables[1].z - tz2) + Math.abs(tables[1].x - tx) * 0.5;
       if (!best || score < best.score) best = { score, v: _v.clone(), w: w.clone() };
     }
-    return best;
+    if (best) return best;
+    if (fallback) return fallback;
+    // nothing bounced on our side from here: a gentle push downward, a fault at worst
+    _d.set(0, -0.35, -1).normalize();
+    return { score: 9, v: _d.clone().multiplyScalar(4.5), w: new THREE.Vector3() };
   }
 }

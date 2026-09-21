@@ -227,6 +227,7 @@ function idle(dt, now) {
   G.cloth.update(dt);
   G.arena.crowd.update(dt, 0.1, 0);
   G.arena.atmosphere.update(dt);
+  if (G.arena.flip) G.arena.flip.update(dt, null);
   G.audio.update(dt, { rally: 0, tension: false, live: false, running: false });
 }
 
@@ -297,6 +298,7 @@ function update(dt, now, realDt) {
   const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
   G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
   G.arena.atmosphere.update(dt);
+  if (G.arena.flip) G.arena.flip.update(dt, G.audio);
   G.arena.setLevel(rallyLvl);
   G.ui.rally(match.rally);
   const tension = match.gamePoint() >= 0 && match.state !== 'POINT_OVER' && match.state !== 'GAME_OVER';
@@ -331,21 +333,44 @@ function computeReach() {
   G.reachZ = apex ? clamp(apex.z, PLAYER.reachMin, PLAYER.z0) : null;
 }
 
-/** After the player's contact: if the ball would miss by a little, bend it into a legal shot. */
+/**
+ * After the player's contact: if the ball would miss by a little, bend it into a legal shot.
+ * Every trial is judged by the live integrator, so what the assist promises the table delivers.
+ * A shot's fate moves one way as its elevation rises (own side or net, then too close to the
+ * net, then inside, then long), so the elevation that lands it is found by bisection; the pace
+ * and the spin are only changed when no elevation works. Whole search: a few dozen simulations.
+ */
 function applyAssist(isServe) {
   const cfg = LEVELS[G.level];
   const b = G.ball;
-  // legal with a margin: the same step the live integrator uses, a clear net, and a landing
-  // well inside the lines, so what the assist promises is what the table delivers
-  const inside = (e) => e.z < -0.12 && e.z > -TABLE.halfL + 0.14 && Math.abs(e.x) < TABLE.halfW - 0.06 && !e.edge;
-  const legal = (state) => {
-    const r = predict(state, { h: 1 / 600, maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
-    if (r.events.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip' || (x.type === 'nearmiss' && x.clearance < 0.012))) return false;
-    const tables = r.events.filter((x) => x.type === 'table');
-    if (isServe) return tables.length >= 2 && tables[0].side === 0 && tables[0].z > 0.25 && tables[0].z < TABLE.halfL - 0.1 && tables[1].side === 1 && inside(tables[1]);
-    return tables.length >= 1 && tables[0].side === 1 && inside(tables[0]);
+  const halfL = TABLE.halfL, halfW = TABLE.halfW;
+  // where a shot ends, as a sign: below zero it needs more height (net, own side, too close to
+  // the net), above zero less (long, wide, the edge), zero when it lands well inside the lines
+  const judge = (state) => {
+    const r = predict(state, { h: 1 / 450, maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
+    const ev = r.events;
+    if (ev.some((x) => x.type === 'netin' || x.type === 'post' || x.type === 'netclip' || (x.type === 'nearmiss' && x.clearance < 0.012))) return -1;
+    const tables = ev.filter((x) => x.type === 'table');
+    if (tables.length < 1) return r.state.p.z > 0 ? -1 : 1;    // never got past the net: more height; over everything: less
+    let land;
+    if (isServe) {
+      const first = tables[0];
+      if (first.side !== 0) return 1;                          // no bounce on the server's side: too far
+      if (first.z >= halfL - 0.1) return -1;                   // down almost on the end line: too steep
+      if (first.z <= 0.25) return 1;                           // bounced up against the net: too far
+      if (tables.length < 2) return 1;                         // over the far end after the bounce
+      land = tables[1];
+      if (land.side !== 1) return -1;                          // twice on the server's side: too slow
+    } else {
+      land = tables[0];
+      if (land.side !== 1) return -1;                          // own side
+    }
+    if (land.z > -0.12) return -1;                             // too close to the net
+    if (land.z < -halfL + 0.14 || land.edge || Math.abs(land.x) > halfW - 0.06) return 1;
+    return 0;
   };
-  if (legal(b)) return 'clean';
+  const o0 = judge(b);
+  if (o0 === 0) return 'clean';
   const speed = b.v.length();
   if (speed < 0.8) return 'none';
   const hl = Math.hypot(b.v.x, b.v.z), th0 = Math.atan2(b.v.y, hl);
@@ -355,55 +380,74 @@ function applyAssist(isServe) {
   const slow = !isServe && speed < 7 && cfg.assistAngle >= 0.15;
   const A = isServe ? SERVE.assist : { angle: cfg.assistAngle, pace: cfg.assistPace, spin: cfg.assistSpin };
   const maxA = slow ? Math.max(A.angle, 0.55) : A.angle;
-  // For each pace and spin worth trying, bisect the elevation on the along-track landing error
-  // (short, net and own-side negative; long positive), which is close to monotone, and keep the
-  // first that lands inside the lines. About a dozen simulations, not hundreds, so no hitch.
-  const spinMax = A.spin || 0, paceMin = A.pace || 0.95;
-  const topspinSign = b.v.z < 0 ? -1 : 1;                  // topspin for a ball travelling -z is negative x
+  // a dead block cannot reach the net from behind the end line under about 4.5 m/s, so the
+  // lower levels may push a slow ball up to lob pace: the boost is a ceiling on the factor
+  const boost = slow ? Math.max(1.45, Math.min(cfg.assistBoost || 1.45, 5.2 / speed)) : 1;
+  // a slow ball met with the face down may be lifted to a lob whatever its angle as hit
+  const hiMax = slow ? Math.max(th0 + maxA, 0.62) : th0 + maxA;
+  const spinMax = A.spin || 0, paceMin = A.pace || 0.95, paceMax = slow ? boost : (isServe ? 1.25 : 1);
+  const topspinSign = b.v.z < 0 ? -1 : 1;                    // topspin for a ball travelling -z is negative x
   const ux = b.v.x / hl, uz = b.v.z / hl;
-  const zTarget = isServe ? -0.7 : -0.72;                  // where we would like the far bounce
-  const alongTarget = (zTarget - b.p.z) / uz;
   const trial = new BallState();
-  const err = (th, s, dw) => {
+  let budget = 100;
+  const at = (th, s, dw) => {
+    budget--;
     trial.copy(b);
     trial.v.set(s * Math.cos(th) * ux, s * Math.sin(th), s * Math.cos(th) * uz);
     trial.w.x += topspinSign * dw;
-    const r = predict(trial, { h: 1 / 400, maxT: 2.5, until: (bb, t, ev) => ev.filter((x) => x.type === 'table').length >= (isServe ? 2 : 1) || ev.some((x) => x.type === 'netin' || x.type === 'floor' || x.type === 'ceiling' || x.type === 'post') });
-    const ev = r.events.filter((x) => x.type !== 'nearmiss');
-    // a landing that skimmed the tape counts as short, so the search settles on the lowest
-    // trajectory that clears the net with room to spare rather than on the clip boundary
-    const nm = r.events.find((x) => x.type === 'nearmiss');
-    const tight = !!(nm && nm.clearance < 0.022);
-    const along = (e) => (tight ? -0.35 : (e.x - b.p.x) * ux + (e.z - b.p.z) * uz - alongTarget);
-    if (!isServe) {
-      const e = ev[0];
-      if (!e) return 1;
-      if (e.type === 'table') return e.side === 1 ? along(e) : -1;
-      if (e.type === 'floor' || e.type === 'ceiling') return 1;
-      return -0.6;
-    }
-    const first = ev[0];
-    if (!first) return 1;
-    if (first.type !== 'table' || first.side !== 0) return first.type === 'table' ? 1 : (first.type === 'floor' ? 1 : 0.8);
-    const second = ev[1];
-    if (!second) return 1;
-    if (second.type === 'table') return second.side === 1 ? along(second) : -1;
-    if (second.type === 'floor' || second.type === 'ceiling') return 1;
-    return -0.6;
+    return judge(trial);
   };
-  const combos = [[1, 0], [0.9, 0], [1, 130], [0.8, 0], [0.9, 260], [0.7, 0], [0.6, 0], [0.5, 0], [1.2, 0], [1.45, 0]]
-    .filter(([sf, dw]) => sf >= paceMin - 1e-6 && dw <= spinMax + 1e-6 && (sf <= 1 || slow));
-  for (const [sf, dw] of combos) {
-    const s = speed * sf;
-    let lo = th0 - maxA, hi = th0 + maxA, elo = err(lo, s, dw), ehi = err(hi, s, dw);
-    if (!(elo < 0 && ehi > 0)) continue;
-    for (let i = 0; i < 7; i++) { const mid = (lo + hi) / 2, e = err(mid, s, dw); if (e < 0) { lo = mid; elo = e; } else { hi = mid; ehi = e; } }
-    for (const th of [hi, lo]) {
-      trial.copy(b);
-      trial.v.set(s * Math.cos(th) * ux, s * Math.sin(th), s * Math.cos(th) * uz);
-      trial.w.x += topspinSign * dw;
-      if (legal(trial)) { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; }
+  // one pace and spin: 0 when an elevation lands it (trial holds the shot), -1 when even the
+  // highest elevation is short of the net (the ball needs pace), +1 when nothing lands it
+  const solve = (s, dw) => {
+    const oc = s === speed && dw === 0 ? o0 : at(th0, s, dw);
+    if (oc === 0) return 0;
+    let lo, hi;
+    if (oc < 0) {
+      lo = th0; hi = hiMax;
+      const o = at(hi, s, dw);
+      if (o === 0) return 0;
+      if (o < 0) return -1;
+    } else {
+      hi = th0; lo = th0 - maxA;
+      const o = at(lo, s, dw);
+      if (o === 0) return 0;
+      if (o > 0) return 1;
     }
+    while (hi - lo > 0.006 && budget > 0) {
+      const mid = (lo + hi) / 2, o = at(mid, s, dw);
+      if (o === 0) return 0;
+      if (o < 0) lo = mid; else hi = mid;
+    }
+    return 1;                                                  // the window is thinner than the search: too fast
+  };
+  const commit = () => { b.v.copy(trial.v); b.w.copy(trial.w); return 'assisted'; };
+  const r = solve(speed, 0);
+  if (r === 0) return commit();
+  if (r > 0) {
+    // too fast: topspin brings it down before any pace comes off
+    for (const dw of [130, 260, 400]) {
+      if (dw > spinMax + 1e-6 || budget <= 0) break;
+      if (solve(speed, dw) === 0) return commit();
+    }
+    for (const sf of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52]) {
+      if (sf < paceMin - 1e-6 || budget <= 0) break;
+      const rr = solve(speed * sf, 0);
+      if (rr === 0) return commit();
+      if (rr < 0) break;                                       // now too slow: nothing lands between
+    }
+  } else {
+    for (const sf of [1.12, 1.25, 1.45, 1.7, 2.0, 2.4]) {
+      if (sf > paceMax + 1e-6 || budget <= 0) break;
+      const rr = solve(speed * sf, 0);
+      if (rr === 0) return commit();
+      if (rr > 0) break;
+    }
+  }
+  // the fate is not always so tidy (a serve's two bounces): a coarse sweep with what is left
+  for (let d = 0.05; d <= maxA + 1e-6 && budget > 0; d += 0.05) {
+    if (th0 + d <= hiMax && at(th0 + d, speed, 0) === 0) return commit();
+    if (budget > 0 && at(th0 - d, speed, 0) === 0) return commit();
   }
   return 'none';
 }
@@ -449,7 +493,7 @@ function handleEvent(e, now) {
     }
     case 'netclip': {
       audio.net('clip', e.speed);
-      cloth.impulse(e.x, e.y, e.dir, 0.05 + 0.06 * e.depth, 0.2);
+      cloth.impulse(e.x, e.y, e.dir, 0.035 + 0.04 * e.depth, 0.2);
       fx.impact(_a.set(e.x, e.y, 0), _n.set(0, 0, -e.dir), 'NET', 6);
       ui.toast('NET CORD', 'net', 800);
       const res = match.onEvent(e, now);
@@ -459,12 +503,12 @@ function handleEvent(e, now) {
     }
     case 'netin': {
       audio.net('in', e.speed);
-      cloth.impulse(e.x, e.y, e.dir, 0.07 + 0.08 * clamp(e.speed / 15, 0, 1), 0.3);
+      cloth.impulse(e.x, e.y, e.dir, 0.05 + 0.06 * clamp(e.speed / 15, 0, 1), 0.3);
       const res = match.onEvent(e, now);
       if (res) handleOutcome(res, now);
       break;
     }
-    case 'nearmiss': audio.net('zip', e.speed); cloth.impulse(e.x, e.y, e.dir, 0.012 + 0.01 * clamp(e.speed / 15, 0, 1), 0.22); break;
+    case 'nearmiss': audio.net('zip', e.speed); cloth.impulse(e.x, e.y, e.dir, 0.004 + 0.004 * clamp(e.speed / 15, 0, 1), 0.2); break;
     case 'post': { audio.net('post'); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
     case 'floor': { audio.floor(e.speed); const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }
     case 'ceiling': { const res = match.onEvent(e, now); if (res) handleOutcome(res, now); break; }

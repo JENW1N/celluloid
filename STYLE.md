@@ -16,10 +16,10 @@ outlines or toon materials inside an asset.
 | court red | `0xa8383a` | the playing floor |
 | court red dark | `0x6f2a2c` | floor border, bleacher risers |
 | wood | `0xd7a56e` | paddle blade, handles, bleacher seats, umpire table top |
-| rubber red | `0xc81e2e` | paddle forehand rubber, ball bucket, scoreboard flaps |
+| rubber red | `0xc81e2e` | paddle forehand rubber, ball bucket |
 | steel | `0x8a8f99` | net posts, floodlight trusses, chair and stand frames, bucket rim |
 | stand navy | `0x1e2a48` | bleacher structure, barrier base stripe, banner ground |
-| accent cyan | `0x4fe3ff` | banner stripes, floodlight lens rims, scoreboard trim |
+| accent cyan | `0x4fe3ff` | banner stripes, floodlight lens rims, the player's flip-card edges (orange for the opponent's) |
 | accent orange | `0xff7a30` | banner stripes, towel, floodlight housings' warning stripe |
 | crowd A | `0x3b4a7a` | spectator bodies |
 | crowd B | `0x8a3b4a` | spectator bodies |
@@ -44,4 +44,6 @@ outlines or toon materials inside an asset.
   geometry: chamfers, gaps between parts, grooves.
 - Material names from the contract's list only: plaster | stone | timber | tile | metal | fabric | foliage | ground.
 - Segment counts: cylinders 12 to 24, spheres 16 to 24, never more. Whole set under 300k triangles.
-- No glyphs, letters, numbers or logos anywhere. A scoreboard is flaps and trim, a banner is stripes.
+- No glyphs, letters, numbers or logos in any asset. The flip scoreboard's cards are blank white in the module;
+  the game draws the numbers on them at load time (a canvas per card) and flips the top card over the bar
+  when the score changes. A banner is stripes.

@@ -119,7 +119,11 @@ while (Date.now() - start < SECONDS * 1000) {
   stats.samples++;
   if (posPrev) moved += Math.hypot(g.pos[0] - posPrev[0], g.pos[1] - posPrev[1]);
   posPrev = g.pos;
-  if ((g.hits || 0) > stats.contacts && g.lastHit) stats.hits.push(`${g.lastHit.serve ? 'S:' : ''}${g.lastHit.q}/${g.lastHit.a}${g.lastHit.speed ? '@' + g.lastHit.speed : ''}`);
+  if ((g.hits || 0) > stats.contacts && g.lastHit) {
+    const h = g.lastHit;
+    // quality/assist@speed out, then what the assist had to work with: speed in, elevation, contact depth and height
+    stats.hits.push(`${h.serve ? 'S:' : ''}${h.q}/${h.a}${h.speed ? '@' + h.speed : ''}${h.a === 'none' && h.el !== undefined ? `(in${h.before} el${h.el} z${h.z} y${h.y})` : ''}`);
+  }
   stats.contacts = Math.max(stats.contacts, g.hits || 0);
   stats.rally = Math.max(stats.rally, g.rally || 0);
   if ((g.points || 0) > stats.points && g.last) stats.log.push(`${g.last[0] === 0 ? 'YOU' : g.last[0] === 1 ? 'CPU' : 'LET'} ${g.last[1] || ''} r${g.last[2] || 0} ${g.score.join('-')}`);

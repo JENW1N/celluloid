@@ -111,6 +111,10 @@ export class AudioEngine {
   toss() { if (!this.ok()) return; this.noise(this.t, 0.02, 0.08, { bp: 3000 }); }
   tick() { if (!this.ok()) return; this.tone('sine', 1320, this.t, 0.07, 0.11); this.tone('sine', 1980, this.t + 0.02, 0.05, 0.05); }
   ui() { if (!this.ok()) return; this.tone('sine', 880, this.t, 0.05, 0.08); }
+  /** A card leaving the bar: a short papery flick. */
+  flap() { if (!this.ok()) return; this.noise(this.t, 0.045, 0.22, { bp: 1500, q: 1.1, send: 0.2 }); this.noise(this.t + 0.02, 0.03, 0.1, { bp: 3200, q: 2 }); }
+  /** The card landing on the pile. */
+  flapLand() { if (!this.ok()) return; this.noise(this.t, 0.03, 0.18, { bp: 900, q: 1.4 }); this.tone('sine', 220, this.t, 0.04, 0.08, { f1: 140 }); }
 
   chargeStart() {
     if (!this.ok()) return;

@@ -1,0 +1,119 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T01:45:03.884Z",
+  "desktop": true,
+  "level": "novice",
+  "style": "charge",
+  "ready_s": 2.632,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 23.9,
+  "contacts": 9,
+  "longest_rally": 2,
+  "points": 11,
+  "score": [
+    4,
+    7
+  ],
+  "samples": 1314,
+  "log": [
+    "YOU WINNER r1 1-0",
+    "CPU ACE r0 1-1",
+    "CPU OUT r2 1-2",
+    "YOU WINNER r2 2-2",
+    "YOU SERVE FAULT r0 3-2",
+    "CPU LONG r1 3-3",
+    "CPU WINNER r1 3-4",
+    "CPU WINNER r1 3-5",
+    "YOU SERVE FAULT r0 4-5",
+    "CPU ACE r0 4-6",
+    "CPU WINNER r1 4-7"
+  ],
+  "hits": [
+    "GOOD/assisted@21.2",
+    "S:GOOD/assisted@7",
+    "EDGE/-@6.1",
+    "S:GOOD/assisted@6.5",
+    "GOOD/assisted@20.6",
+    "PERFECT/none@21.6",
+    "S:GOOD/assisted@6.8",
+    "S:GOOD/assisted@6.6",
+    "S:LATE/assisted@6.3"
+  ],
+  "final": {
+    "pos": [
+      -0.0021456717188465205,
+      0.9208746004734578
+    ],
+    "fps": 238,
+    "speed": 1.4276945578965532,
+    "score": [
+      4,
+      7
+    ],
+    "over": false,
+    "draws": 198,
+    "tris": 140660,
+    "rally": 0,
+    "hits": 9,
+    "state": "PLAY",
+    "ball": [
+      1.0939733727072327,
+      0.02,
+      4.6009169924625475
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        610.99168314473,
+        593.0002983056946
+      ],
+      "pxPerM": [
+        414.3133095584915,
+        -352.83681100447666
+      ]
+    },
+    "points": 11,
+    "ballv": [
+      0.2414318602296322,
+      0.005243952896961451,
+      1.407122918749996
+    ],
+    "spin": 71.38424636440186,
+    "level": "novice",
+    "server": 0,
+    "match": "POINT_OVER",
+    "live": true,
+    "last": [
+      1,
+      "WINNER",
+      1
+    ],
+    "lastHit": {
+      "q": "LATE",
+      "a": "assisted",
+      "serve": true,
+      "before": 7.5,
+      "speed": 6.3,
+      "el": -0.527,
+      "spin": -48,
+      "z": 1.4,
+      "y": 1.14,
+      "pad": 4.3
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.608,
+    10.132,
+    17.637,
+    25.112,
+    32.591,
+    40.105,
+    47.627,
+    55.129
+  ],
+  "fails": [],
+  "result": "PASS"
+}

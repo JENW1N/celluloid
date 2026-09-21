@@ -45,9 +45,9 @@ export class NetCloth {
       const d = Math.hypot(dx, dy);
       if (d > radius) continue;
       const f = (1 - d / radius);
-      prev[i * 3 + 2] -= dir * strength * f * f;
+      prev[i * 3 + 2] -= dir * strength * 0.17 * f * f;      // reach `strength` in about 50 ms
     }
-    this.tv += dir * strength * 6 * Math.max(0, 1 - Math.abs(lp.y - 0.07) / 0.1);
+    this.tv += dir * strength * 2.5 * Math.max(0, 1 - Math.abs(lp.y - 0.07) / 0.1);
     this.active = 3;
   }
   update(dt) {
@@ -61,16 +61,20 @@ export class NetCloth {
       this.t += H;
       for (let iy = 1; iy < rows; iy++) for (let ix = 1; ix < cols - 1; ix++) {
         const i = (iy * cols + ix) * 3 + 2;
-        const z = pos[i], vz = (z - prev[i]) * 0.985;
+        const z = pos[i], vz = (z - prev[i]) * 0.955;
         const nb = (pos[i - 3] + pos[i + 3] + pos[i - cols * 3] + (iy < rows - 1 ? pos[i + cols * 3] : z)) * 0.25;
         // a breath of air moves the mesh all the time, more toward the bottom, so it is never rigid
         const sag = iy / (rows - 1);
-        const wind = 0.5 * sag * Math.sin(this.t * 1.7 + base[i - 2] * 3.1) + 0.3 * sag * Math.sin(this.t * 2.9 - base[i - 2] * 5.3);
+        const wind = 0.24 * sag * Math.sin(this.t * 1.7 + base[i - 2] * 3.1) + 0.14 * sag * Math.sin(this.t * 2.9 - base[i - 2] * 5.3);
         const acc = 140 * (base[i] - z) + 700 * (nb - z) + wind;
         prev[i] = z;
-        pos[i] = Math.max(-0.16, Math.min(0.16, z + vz + acc * H * H));
+        pos[i] = z + vz + acc * H * H;
       }
     }
+    // a net cannot stretch more than a hand's width: if the sim ever does, it is wrong, so heal it
+    let worst = 0;
+    for (let i = 2; i < pos.length; i += 3) worst = Math.max(worst, Math.abs(pos[i] - base[i]));
+    if (worst > 0.12) { pos.set(base); prev.set(base); this.tz = 0; this.tv = 0; }
     const h = H;
     let energy = 0;
     if (this.pressing) {
@@ -79,7 +83,7 @@ export class NetCloth {
         const dx = base[i * 3] - x, dy = base[i * 3 + 1] - y, d = Math.hypot(dx, dy);
         if (d > r) continue;
         const want = dir * (depth + 0.02) * (1 - (d / r) * (d / r));
-        if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.005; }
+        if (dir * pos[i * 3 + 2] < dir * want) { pos[i * 3 + 2] = want; prev[i * 3 + 2] = want - dir * 0.0012; }
       }
       this.tv += dir * depth * 3 * h * 30;
       this.pressing = null;

@@ -1,0 +1,120 @@
+{
+  "url": "http://localhost:9000/__game__/game/",
+  "utc": "2026-09-21T01:46:09.206Z",
+  "desktop": false,
+  "level": "rookie",
+  "style": "charge",
+  "ready_s": 2.489,
+  "tapped": true,
+  "startGone": true,
+  "moved_m": 27.78,
+  "contacts": 10,
+  "longest_rally": 3,
+  "points": 11,
+  "score": [
+    2,
+    9
+  ],
+  "samples": 1549,
+  "log": [
+    "CPU ACE r0 0-1",
+    "CPU ACE r0 0-2",
+    "CPU WINNER r1 0-3",
+    "CPU WINNER r3 0-4",
+    "CPU WINNER r2 0-5",
+    "CPU LONG r1 0-6",
+    "CPU WINNER r1 0-7",
+    "CPU WINNER r1 0-8",
+    "YOU SERVE FAULT r0 1-8",
+    "YOU WINNER r1 2-8",
+    "CPU WINNER r1 2-9"
+  ],
+  "hits": [
+    "S:GOOD/assisted@6.7",
+    "S:GOOD/assisted@6.7",
+    "GOOD/assisted@21",
+    "GOOD/assisted@19.1",
+    "EDGE/-@15.2",
+    "S:GOOD/assisted@6.9",
+    "S:GOOD/assisted@6.7",
+    "GOOD/assisted@19.6",
+    "S:GOOD/assisted@6.8",
+    "S:GOOD/assisted@6.8"
+  ],
+  "final": {
+    "pos": [
+      0.000007697068692093854,
+      0.918172734721183
+    ],
+    "fps": 236,
+    "speed": 3.3708981134875007,
+    "score": [
+      2,
+      9
+    ],
+    "over": false,
+    "draws": 160,
+    "tris": 125324,
+    "rally": 0,
+    "hits": 10,
+    "state": "PLAY",
+    "ball": [
+      -0.00039303286882913627,
+      1.337250895382396,
+      -0.25759327389770537
+    ],
+    "paddleZ": 1.62,
+    "screen": {
+      "pad": [
+        194.88334506728356,
+        615.9354501744436
+      ],
+      "pxPerM": [
+        302.4738872196332,
+        -252.05970880871405
+      ]
+    },
+    "points": 11,
+    "ballv": [
+      0.0012349397826127305,
+      -0.35360876126377355,
+      -3.3522997196543782
+    ],
+    "spin": 173.50029149957913,
+    "level": "rookie",
+    "server": 0,
+    "match": "IN_PLAY",
+    "live": true,
+    "last": [
+      1,
+      "WINNER",
+      1
+    ],
+    "lastHit": {
+      "q": "GOOD",
+      "a": "assisted",
+      "serve": true,
+      "before": 10,
+      "speed": 6.8,
+      "el": -0.503,
+      "spin": -55,
+      "z": 1.52,
+      "y": 1.16,
+      "pad": 5.7
+    }
+  },
+  "errors": [],
+  "missing": [],
+  "frames": [
+    2.698,
+    10.119,
+    17.629,
+    25.155,
+    32.627,
+    40.113,
+    47.626,
+    55.114
+  ],
+  "fails": [],
+  "result": "PASS"
+}

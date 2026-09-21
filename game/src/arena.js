@@ -6,9 +6,10 @@
 import * as THREE from 'three';
 import { ASSET } from '../assetlib.js';
 import { toonify, toonMaterial, hullGeometry, outlineMaterial } from './toon.js';
+import { FlipBoard } from './flipboard.js';
 import { TABLE, PALETTE, clamp } from './consts.js';
 
-export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'scoreboard_flip', 'ball_bucket', 'towel_box'];
+export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'flip_scoreboard', 'ball_bucket', 'towel_box'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);
 
 const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _e = new THREE.Euler();
@@ -263,9 +264,14 @@ export async function buildArena(scene, { phone = false } = {}) {
 
   // courtside furniture
   const setPiece = async (name, x, y, z, ry, outline) => { const o = toonify(await ASSET(`./assets/${name}.js`), { outline }); o.position.set(x, y, z); o.rotation.y = ry; scene.add(o); return o; };
-  await setPiece('umpire_table', 3.1, 0, 0.5, -Math.PI / 2, 0.004);
-  await setPiece('referee_chair', 3.62, 0, 0.5, -Math.PI / 2, 0.003);
-  await setPiece('scoreboard_flip', 3.1, TABLE.H, 0.5, -Math.PI / 2, 0.002);
+  // the umpire's station sits close enough to the table to be on screen at 16:10 and wider
+  await setPiece('umpire_table', 2.35, 0, -0.25, -Math.PI / 2, 0.004);
+  await setPiece('referee_chair', 2.87, 0, -0.25, -Math.PI / 2, 0.003);
+  // the umpire's flip scoreboard, turned toward the camera so the cards read
+  const flipInst = toonify(await ASSET('./assets/flip_scoreboard.js', { keepHierarchy: true }), { outline: 0.0022 });
+  flipInst.position.set(2.3, TABLE.H + 0.001, 0.0); flipInst.rotation.y = -0.85; flipInst.scale.setScalar(0.92);
+  scene.add(flipInst);
+  out.flip = new FlipBoard(flipInst);
   await setPiece('ball_bucket', 2.45, 0, -2.3, 0.4, 0.003);
   await setPiece('towel_box', 2.45, 0, 2.05, 0.2, 0.003);
   await setPiece('towel_box', -2.45, 0, -2.05, -0.3, 0.003);
@@ -282,7 +288,6 @@ export async function buildArena(scene, { phone = false } = {}) {
     if (d.userData.segments) { displays.push(d.userData.segments); for (const k of Object.keys(d.userData.segments)) { const m = d.userData.segments[k]; m.userData.dark = m.material; } }
   };
   await makeDisplay(0, 4.6, -11.6, 0, 2.2);
-  await makeDisplay(2.95, TABLE.H, 0.78, 0, 0.3);
   out.setScore = (a, b) => {
     const show = (segs, key, value, lit, blankLeading) => {
       const tens = Math.floor(value / 10) % 10, ones = value % 10;
@@ -297,6 +302,7 @@ export async function buildArena(scene, { phone = false } = {}) {
       show(segs, 'l', a, litL, true); show(segs, 'r', b, litR, true);
       if (segs.colon0) segs.colon0.material = litL; if (segs.colon1) segs.colon1.material = litR;
     }
+    if (out.flip) out.flip.set(a, b);
   };
   out.setScore(0, 0);
   out.setLevel = (lvl) => { const k = 0.15 + 0.9 * clamp(lvl, 0, 1); for (const m of out.banners) m.emissiveIntensity = k; };

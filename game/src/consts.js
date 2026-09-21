@@ -36,10 +36,10 @@ export const PALETTE = {
 // sigma the landing scatter in metres, whiff the chance it swings through nothing. All three
 // reach an ordinary return; what separates them is pace, spin, placement, errors and smashing.
 export const LEVELS = {
-  novice: { name: 'NOVICE', speed: 4.0, react: 0.2, sigma: 0.34, sigmaTheta: 0.06, spd: [4.3, 6.2], spin: [0, 50], smash: false, letsOut: 0, whiff: 0.2, place: 'center', early: 0, serveSpd: [4.0, 5.0], serveSpin: 0, assist: 1.9, assistAngle: 0.32, assistSpin: 420, assistPace: 0.5, wrist: 0.75, slow: 0.8, aim: true },
-  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.3, sigmaTheta: 0.05, spd: [5.0, 7.5], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.14, place: 'center', early: 0, serveSpd: [4.6, 5.8], serveSpin: 0, assist: 1.75, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, wrist: 0.65, slow: 0.86, aim: true },
-  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.45, assistAngle: 0.16, assistSpin: 260, assistPace: 0.8, wrist: 0.45, slow: 0.94, aim: true },
-  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.2, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, wrist: 0.3, slow: 1.0, aim: false },
+  novice: { name: 'NOVICE', speed: 4.0, react: 0.2, sigma: 0.34, sigmaTheta: 0.06, spd: [4.3, 6.2], spin: [0, 50], smash: false, letsOut: 0, whiff: 0.2, place: 'center', early: 0, serveSpd: [4.0, 5.0], serveSpin: 0, assist: 1.9, assistAngle: 0.32, assistSpin: 420, assistPace: 0.5, assistBoost: 2.4, wrist: 0.75, slow: 0.8, aim: true },
+  rookie: { name: 'ROOKIE', speed: 5.0, react: 0.15, sigma: 0.3, sigmaTheta: 0.05, spd: [5.0, 7.5], spin: [0, 120], smash: false, letsOut: 0, whiff: 0.14, place: 'center', early: 0, serveSpd: [4.6, 5.8], serveSpin: 0, assist: 1.75, assistAngle: 0.28, assistSpin: 420, assistPace: 0.6, assistBoost: 2.0, wrist: 0.65, slow: 0.86, aim: true },
+  club: { name: 'CLUB', speed: 6.2, react: 0.13, sigma: 0.15, sigmaTheta: 0.028, spd: [8, 14], spin: [140, 380], smash: true, letsOut: 0.25, whiff: 0.05, place: 'corners', early: 0.15, serveSpd: [6, 8], serveSpin: 160, assist: 1.45, assistAngle: 0.16, assistSpin: 260, assistPace: 0.8, assistBoost: 1.45, wrist: 0.45, slow: 0.94, aim: true },
+  pro: { name: 'PRO', speed: 8.5, react: 0.07, sigma: 0.06, sigmaTheta: 0.012, spd: [12, 22], spin: [350, 700], smash: true, letsOut: 1, whiff: 0.012, place: 'away', early: 0.45, serveSpd: [7, 10], serveSpin: 420, assist: 1.2, assistAngle: 0.06, assistSpin: 0, assistPace: 0.95, assistBoost: 1.0, wrist: 0.3, slow: 1.0, aim: false },
 };
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
