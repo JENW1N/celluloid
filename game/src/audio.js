@@ -4,6 +4,13 @@
  * impact speed over a plywood thud; a table bounce is lower and shorter; the net cord thrums at
  * 150 Hz; a thin brush hisses; the crowd is filtered noise that swells with the rally and goes
  * silent at game point. No two hits sound the same, and every one is exactly as hard as the hit.
+ *
+ * The rally is the music. Every contact also plays a note: yours ping high and the CPU's pong
+ * a little lower, and the pair climbs a pentatonic scale one step per exchange. The beat is the
+ * rally's own tempo: a soft kick on each hit from the fourth, an off-beat hat half a hit later
+ * from the sixth, a bass root under each pong from the eighth, and a pad from the twelfth whose
+ * chord moves every four hits. The point ends the song with a crash and a resolving arpeggio
+ * before the applause. At match point the drums drop out and a heartbeat takes the beat.
  */
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const rr = (a, b) => a + Math.random() * (b - a);
@@ -11,7 +18,8 @@ const rr = (a, b) => a + Math.random() * (b - a);
 export class AudioEngine {
   constructor() {
     this.ctx = null; this.muted = false;
-    this.cheerLvl = 0; this.pulseT = 0; this.chargeNodes = null; this.lastChargeTick = 0;
+    this.cheerLvl = 0; this.pulseT = 0; this.chargeNodes = null; this.lastChargeTick = 0; this.heartT = 0;
+    this.musicReset();
   }
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
@@ -113,6 +121,8 @@ export class AudioEngine {
   ui() { if (!this.ok()) return; this.tone('sine', 880, this.t, 0.05, 0.08); }
   /** A card leaving the bar: a short papery flick. */
   flap() { if (!this.ok()) return; this.noise(this.t, 0.045, 0.22, { bp: 1500, q: 1.1, send: 0.2 }); this.noise(this.t + 0.02, 0.03, 0.1, { bp: 3200, q: 2 }); }
+  /** A rubber stamp coming down on paper. */
+  stamp() { if (!this.ok()) return; this.tone('sine', 95, this.t, 0.14, 0.4, { f1: 48, send: 0.15 }); this.noise(this.t, 0.05, 0.35, { lp: 700 }); this.noise(this.t + 0.01, 0.03, 0.12, { bp: 2400, q: 1.2 }); }
   /** The card landing on the pile. */
   flapLand() { if (!this.ok()) return; this.noise(this.t, 0.03, 0.18, { bp: 900, q: 1.4 }); this.tone('sine', 220, this.t, 0.04, 0.08, { f1: 140 }); }
 
@@ -195,7 +205,73 @@ export class AudioEngine {
     lfo.connect(lg); lg.connect(bp.frequency); lfo.start();
     src.start();
   }
-  /** Per frame: the crowd level, the silence at game point, the rally pulse. */
+  // ---------------------------------------------------------------- the rally is the music
+  musicReset() { if (this.mus && this.mus.pad) this.padOff(0.2); this.mus = { lastT: -1, period: 0.8, pad: null, chord: -1 }; }
+  /** D major pentatonic from D3 up: a scale with no wrong notes, so any rally sounds meant. */
+  note(i) {
+    const S = [146.83, 164.81, 185.0, 220.0, 246.94, 293.66, 329.63, 369.99, 440.0, 493.88, 587.33, 659.25, 739.99, 880.0];
+    return S[Math.max(0, Math.min(S.length - 1, i))];
+  }
+  /** A contact that counts: owner 0 pings, owner 1 pongs; rally is the count after this hit. */
+  musicHit(owner, rally, hushed = false) {
+    if (!this.ok()) return;
+    const M = this.mus, t = this.t;
+    const gap = M.lastT > 0 ? t - M.lastT : 0;
+    if (gap > 0.25 && gap < 2.2) M.period = M.period * 0.6 + gap * 0.4;      // the rally's own tempo
+    M.lastT = t;
+    const step = Math.min(8, Math.floor(rally / 2));                          // one step per exchange
+    const lift = Math.min(1, rally / 12);
+    if (owner === 0) {
+      const f = this.note(step + 5) * 2;
+      this.tone('sine', f, t, 0.34, 0.065 + 0.03 * lift, { send: 0.45 });
+      this.tone('sine', f * 2.76, t, 0.1, 0.012 + 0.006 * lift, { send: 0.3 });   // the bell's bright partial
+    } else {
+      const f = this.note(step + 3);
+      this.tone('triangle', f, t, 0.3, 0.075 + 0.03 * lift, { send: 0.35 });
+      this.tone('sine', f * 4, t, 0.07, 0.014, { send: 0.2 });                    // a marimba's knock
+    }
+    if (hushed) return;                                                          // match point: the heart keeps time
+    if (rally >= 4) this.tone('sine', 110, t, 0.14, 0.15 + 0.05 * lift, { f1: 45, send: 0.05 });
+    if (rally >= 6) this.noise(t + M.period / 2, 0.035, 0.04, { hp: 7000, send: 0.1 });
+    if (rally >= 8 && owner === 1) this.tone('triangle', this.note(step % 5) / 2, t, Math.min(0.6, M.period * 0.9), 0.085, { send: 0.1, attack: 0.01 });
+    if (rally >= 12) this.padTo(rally);
+  }
+  /** The pad: four soft saws through a low-pass, the chord moving D, A, B minor, G every four hits. */
+  padTo(rally) {
+    const M = this.mus, c = this.ctx;
+    const chords = [[146.83, 220.0, 293.66, 369.99], [220.0, 277.18, 329.63, 440.0], [246.94, 293.66, 369.99, 493.88], [196.0, 246.94, 293.66, 392.0]];
+    if (!M.pad) {
+      const g = c.createGain(); g.gain.value = 0.0001; g.connect(this.dry);
+      const sendG = c.createGain(); sendG.gain.value = 0.5; g.connect(sendG); sendG.connect(this.verbSend);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1200; lp.Q.value = 0.4; lp.connect(g);
+      const osc = [0, 1, 2, 3].map(() => { const o = c.createOscillator(); o.type = 'sawtooth'; o.connect(lp); o.start(); return o; });
+      M.pad = { g, osc };
+      g.gain.setTargetAtTime(0.024, this.t, 0.7);
+    }
+    const ci = Math.floor((rally - 12) / 4) % chords.length;
+    if (ci !== M.chord) { M.chord = ci; chords[ci].forEach((f, i) => M.pad.osc[i].frequency.setTargetAtTime(f * (1 + (i - 1.5) * 0.0025), this.t, 0.09)); }
+  }
+  padOff(tc = 0.4) {
+    const M = this.mus;
+    if (!M || !M.pad || !this.ok()) return;
+    const pad = M.pad; M.pad = null; M.chord = -1;
+    pad.g.gain.setTargetAtTime(0.0001, this.t, tc);
+    for (const o of pad.osc) o.stop(this.t + tc * 6 + 0.05);
+  }
+  /** The point ends the song: a crash and an arpeggio that resolves, bright for you, dark for the CPU. */
+  musicPoint(win, rally) {
+    if (!this.ok()) return;
+    this.padOff(0.5);
+    this.mus.lastT = -1;
+    if (rally < 6) return;
+    const t = this.t, big = Math.min(1, rally / 16);
+    this.noise(t, 1.4, 0.14 + 0.1 * big, { hp: 4500, send: 0.5, attack: 0.002 });
+    const arp = win ? [293.66, 369.99, 440.0, 587.33] : [293.66, 349.23, 440.0, 523.25];
+    arp.forEach((f, i) => this.tone('triangle', f, t + i * 0.06, 0.7, 0.065, { send: 0.5 }));
+    this.tone('sine', 73.42, t, 0.9, 0.12, { send: 0.2 });
+  }
+
+  /** Per frame: the crowd level, the silence at game point, the heartbeat under match point. */
   update(dt, ctx) {
     if (this.clapQueue && this.clapQueue.length && this.ok()) {
       for (let k = 0; k < 6 && this.clapQueue.length; k++) { const c = this.clapQueue.shift(); this.noise(Math.max(c.t, this.t), 0.012, c.g, { bp: 2500, q: 1.5, send: 0.4 }); }
@@ -204,16 +280,20 @@ export class AudioEngine {
     const rallyLvl = clamp((ctx.rally - 2) / 10, 0, 1);
     let target = ctx.running ? 0.05 + 0.10 * rallyLvl + 0.08 * this.cheerLvl : 0.02;
     if (ctx.tension) target *= 0.1;
+    target *= 1 - 0.85 * Math.max(ctx.ink || 0, ctx.cinema || 0);            // the hall holds its breath
     this.amb.gain.setTargetAtTime(target, this.t, 0.5);
     this.cheerLvl = Math.max(0, this.cheerLvl - dt * 0.4);
-    if (ctx.running && ctx.live && ctx.rally >= 6 && !ctx.tension) {
-      const bpm = 70 + Math.min(80, (ctx.rally - 6) * 8);
-      this.pulseT += dt;
-      if (this.pulseT >= 60 / bpm) {
-        this.pulseT = 0;
-        this.tone('sine', 55, this.t, 0.09, 0.28, { f1: 40, send: 0.1 });
-        this.tone('sine', 50, this.t + 0.16, 0.07, 0.2, { f1: 38, send: 0.1 });
+    if (!ctx.running) this.padOff(0.3);
+    // match point: a heartbeat, lub-dub, a little quicker once the ball is live
+    if (ctx.running && (ctx.cinema || 0) > 0.4) {
+      const bpm = ctx.live ? 74 : 62;
+      this.heartT += dt;
+      if (this.heartT >= 60 / bpm) {
+        this.heartT = 0;
+        const g = 0.3 * Math.min(1, ctx.cinema);
+        this.tone('sine', 54, this.t, 0.11, g, { f1: 38, send: 0.08 });
+        this.tone('sine', 48, this.t + 0.17, 0.09, g * 0.72, { f1: 34, send: 0.08 });
       }
-    } else this.pulseT = 0;
+    } else this.heartT = 0;
   }
 }

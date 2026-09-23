@@ -48,6 +48,39 @@ export function outlineMaterial(width, color = 0x0e1018) {
   return outlineMats.get(key);
 }
 
+/**
+ * Ink focus. One uniform, eased by the game from 0 to 1, draws every background material in
+ * pencil on paper: the colour a fragment would have becomes a tone, bright tones go to paper,
+ * dark ones to graphite, and the shade takes screen-space hatching in two directions. The table,
+ * the net, the ball and the blades are never inkified, so they keep their colour.
+ */
+export const INK = { value: 0 };
+export const INK_PX = { value: 1 };
+const INK_GLSL = `
+  if (uInk > 0.001) {
+    vec3 inkC = gl_FragColor.rgb;
+    float tone = clamp(dot(inkC, vec3(0.299, 0.587, 0.114)) * 2.6, 0.0, 1.0);
+    vec3 paper = vec3(0.94, 0.92, 0.86), lead = vec3(0.25, 0.26, 0.31);
+    vec3 pencil = mix(lead, paper, smoothstep(0.0, 0.42, tone));
+    float s = 7.0 * uInkPx;
+    float h1 = 1.0 - step(0.16, fract((gl_FragCoord.x + gl_FragCoord.y) / s));
+    float h2 = 1.0 - step(0.16, fract((gl_FragCoord.x - gl_FragCoord.y) / s));
+    pencil = mix(pencil, lead, h1 * (1.0 - smoothstep(0.34, 0.62, tone)) * 0.72);
+    pencil = mix(pencil, lead, h2 * (1.0 - smoothstep(0.14, 0.34, tone)) * 0.72);
+    gl_FragColor.rgb = mix(inkC, pencil, uInk);
+  }
+`;
+export function inkify(m) {
+  if (!m || !m.userData || m.userData.ink) return;
+  m.userData.ink = true;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uInk = INK; sh.uniforms.uInkPx = INK_PX;
+    sh.fragmentShader = 'uniform float uInk;\nuniform float uInkPx;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>' + INK_GLSL);
+  };
+  m.customProgramCacheKey = () => 'ink';
+  m.needsUpdate = true;
+}
+
 const toonCache = new Map();
 export function toonMaterial(src) {
   if (!src) return src;

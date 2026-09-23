@@ -11,6 +11,7 @@
   "agent": "Claude Code",
   "models": [
     "Claude Fable 5.1 (claude-fable-5-1) wrote the code, the assets and the critiques",
+    "Claude Opus 5.5 (claude-opus-5-5) built the four halls, the rally music, the pencil mode, match point and the match report",
     "no image or sound generator: every sound is synthesised at runtime from the physics"
   ],
   "own_art": false,

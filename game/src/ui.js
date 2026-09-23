@@ -9,7 +9,8 @@ export class UI {
   constructor() {
     this.e = {
       load: $('load'), barf: $('barf'), loadmsg: $('loadmsg'), start: $('start'), startb: $('startb'), hud: $('hud'),
-      over: $('over'), overh: $('overh'), overp: $('overp'), overb: $('overb'), menub: $('menub'),
+      over: $('over'), overh: $('overh'), overv: $('overv'), overb: $('overb'), menub: $('menub'), nextb: $('nextb'),
+      fc0: $('fc0'), fc1: $('fc1'), overstamp: $('overstamp'), overtags: $('overtags'), overunlock: $('overunlock'),
       s0: $('s0'), s1: $('s1'), d0: $('d0'), d1: $('d1'), cpu: $('cpuname'), rally: $('rally'), toast: $('toast'),
       quality: $('quality'), hint: $('hint'), gp: $('gp'), charge: $('charge'), chargef: $('chargef'), flash: $('flash'),
       vig: $('vig'), touch: $('touch'), toss: $('toss'), mute: $('mute'), perf: $('perf'),
@@ -66,11 +67,54 @@ export class UI {
   }
   focus(level) { this.e.vig.style.opacity = Math.max(this.e.gp.classList.contains('on') ? 1 : 0, 0.22 + level * 0.6); }
   flash(color = 'rgba(255,255,255,0.35)') { const f = this.e.flash; f.style.background = color; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
-  showOver(win, score, stats) {
-    this.e.overh.textContent = win ? 'GAME' : 'GAME · CPU';
-    this.e.overp.innerHTML = `${score[0]} · ${score[1]}<br><small>longest rally ${stats.longestRally} · winners ${stats.winners[0]} · errors ${stats.errors[0]}</small>`;
-    this.e.over.classList.add('on');
+  /** The menu cards carry the ladder: a stamp on each beaten level, a padlock on each not yet open. */
+  setLadder(ladder, order, levels) {
+    for (const b of document.querySelectorAll('.lv')) {
+      const k = b.dataset.level, beaten = ladder.beaten[k], i = order.indexOf(k);
+      b.classList.toggle('beaten', !!beaten);
+      b.classList.toggle('locked', !ladder.open.includes(k));
+      const st = b.querySelector('.stamp'); if (st) st.textContent = beaten ? `BEATEN ${beaten[0]}-${beaten[1]}` : '';
+      const lk = b.querySelector('.lock'); if (lk) lk.textContent = i > 0 ? `BEAT ${levels[order[i - 1]].name}` : '';
+    }
   }
-  hideOver() { this.e.over.classList.remove('on'); }
+  /**
+   * The match report: the winner's name, the score as two flip cards that riffle up to it, a
+   * rubber stamp when you win, the numbers of the game as paper tags, and the next rung unlocked.
+   */
+  showOver(r, audio) {
+    const e = this.e;
+    e.overv.textContent = `FINAL · ${r.venue}`;
+    e.overh.textContent = r.win ? 'YOU WIN' : `${r.opp} WINS`;
+    e.over.classList.toggle('won', r.win); e.over.classList.toggle('lost', !r.win);
+    const cards = [e.fc0, e.fc1];
+    for (const c of cards) { c.classList.remove('win'); c.querySelector('b').textContent = '0'; }
+    e.overstamp.classList.remove('on');
+    e.overunlock.className = 'unlock'; e.overunlock.textContent = '';
+    const top = Math.max(r.score[0], r.score[1]);
+    e.overtags.innerHTML = r.tags.map(([k, v], i) => `<span class="tag c${i % 4}" style="--r:${(((i * 5) % 7) - 3) * 0.9}deg;--d:${(top * 0.06 + 0.2 + i * 0.09).toFixed(2)}s">${k}<b>${v}</b></span>`).join('');
+    e.nextb.hidden = !r.next;
+    if (r.next) e.nextb.textContent = `NEXT · ${r.next}`;
+    e.nextb.classList.toggle('big', !!r.next); e.overb.classList.toggle('big', !r.next);
+    e.over.classList.add('on');
+    // the cards riffle up to the score, the way the umpire's do
+    let n = 0;
+    clearInterval(this.riffle);
+    this.riffle = setInterval(() => {
+      n++;
+      cards.forEach((c, i) => { if (n <= r.score[i]) { const b = c.querySelector('b'); b.textContent = n; b.classList.remove('flap'); void b.offsetWidth; b.classList.add('flap'); } });
+      if (audio && n % 2 === 0) audio.flap();
+      if (n >= top) {
+        clearInterval(this.riffle);
+        cards[r.win ? 0 : 1].classList.add('win');
+        if (audio) audio.flapLand();
+        setTimeout(() => {
+          if (r.win) { e.overstamp.classList.add('on'); if (audio) audio.stamp(); }
+          if (r.unlocked) { e.overunlock.textContent = `${r.unlocked} UNLOCKED`; e.overunlock.classList.add('on'); }
+          else if (r.complete) { e.overunlock.textContent = 'LADDER COMPLETE'; e.overunlock.classList.add('on', 'gold'); }
+        }, 260);
+      }
+    }, 60);
+  }
+  hideOver() { clearInterval(this.riffle); this.e.over.classList.remove('on'); }
   perf(text) { this.e.perf.textContent = text; }
 }

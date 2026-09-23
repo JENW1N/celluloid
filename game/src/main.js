@@ -6,18 +6,19 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609212236';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, clamp } from './consts.js?v=202609212236';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609212236';
-import { PlayerPaddle } from './player.js?v=202609212236';
-import { Input } from './input.js?v=202609212236';
-import { Match } from './rules.js?v=202609212236';
-import { Bot } from './bots.js?v=202609212236';
-import { AudioEngine } from './audio.js?v=202609212236';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609212236';
-import { NetCloth } from './netcloth.js?v=202609212236';
-import { buildArena, ASSET_LIST } from './arena.js?v=202609212236';
-import { UI } from './ui.js?v=202609212236';
+import { preloadAssets } from '../assetlib.js?v=202609232250';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, LADDER, INK_RALLY, clamp } from './consts.js?v=202609232250';
+import { INK, INK_PX } from './toon.js?v=202609232250';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609232250';
+import { PlayerPaddle } from './player.js?v=202609232250';
+import { Input } from './input.js?v=202609232250';
+import { Match } from './rules.js?v=202609232250';
+import { Bot } from './bots.js?v=202609232250';
+import { AudioEngine } from './audio.js?v=202609232250';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609232250';
+import { NetCloth } from './netcloth.js?v=202609232250';
+import { buildArena, ASSET_LIST, VENUES } from './arena.js?v=202609232250';
+import { UI } from './ui.js?v=202609232250';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -45,11 +46,24 @@ const G = {
   ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [], gameTime: 0, targetRing: null,
   approach: 1, tCross: null, lastSwing: null, lastBotServe: null,
   slow: [], profAssist: 0, profServe: 0, profEv: '', botPending: null, floorHits: 0, lastFloorT: -1,
+  ink: 0, cinema: 0, mstats: null, ladder: null, nextLevel: null,
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
 
 const isPhone = () => Math.min(window.innerWidth, window.innerHeight) < 600 || Input.prefersTouch();
+
+// ---------------------------------------------------------------- the ladder
+// NOVICE is open from the start; beating a level opens the next. A locked level can still be
+// played: the padlock marks the ladder, it is not a wall between a judge and the arena.
+function loadLadder() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem('pongping.ladder') || 'null'); } catch (e) { d = null; }
+  if (!d || typeof d !== 'object') d = {};
+  return { open: Array.isArray(d.open) && d.open.length ? d.open : ['novice'], beaten: d.beaten && typeof d.beaten === 'object' ? d.beaten : {} };
+}
+function saveLadder() { try { localStorage.setItem('pongping.ladder', JSON.stringify(G.ladder)); } catch (e) { /* private window: the ladder lives for this visit */ } }
+const venueOf = (level) => (LEVELS[level] && LEVELS[level].venue) || 'arena';
 
 // ---------------------------------------------------------------- boot
 async function boot() {
@@ -58,6 +72,9 @@ async function boot() {
   await Promise.all(ASSET_LIST.map((u) => preloadAssets([u]).then(() => G.ui.loading(0.05 + 0.6 * (++n / ASSET_LIST.length), u.replace('./assets/', '').replace('.js', '')))));
   G.ui.loading(0.7, 'building the venue');
   G.arena = await buildArena(scene, { phone: isPhone() });
+  G.arena.applyVenue(venueOf(G.level));
+  INK_PX.value = renderer.getPixelRatio();
+  G.ladder = loadLadder();
   G.ballVis = new BallVisual(G.arena.ball, scene, camera);
   G.fx = new Impacts(scene);
   G.confetti = new Confetti(scene);
@@ -80,6 +97,7 @@ async function boot() {
   G.ui.setTouch(G.input.touch);
   wireButtons();
   G.ui.setLevel(G.level, LEVELS[G.level].name);
+  G.ui.setLadder(G.ladder, LADDER, LEVELS);
   G.ui.onScore = (a, b) => G.arena.setScore && G.arena.setScore(a, b);
   G.ui.setScore([0, 0], -1, false);
   resize();
@@ -95,10 +113,11 @@ async function boot() {
 }
 
 function wireButtons() {
-  for (const b of document.querySelectorAll('.lv')) b.addEventListener('click', () => { G.level = b.dataset.level; G.ui.setLevel(G.level, LEVELS[G.level].name); G.audio.ui(); });
+  for (const b of document.querySelectorAll('.lv')) b.addEventListener('click', () => { G.level = b.dataset.level; G.ui.setLevel(G.level, LEVELS[G.level].name); G.arena.applyVenue(venueOf(G.level)); G.audio.ui(); });
+  if (G.ui.e.nextb) G.ui.e.nextb.addEventListener('click', () => { if (G.nextLevel) startGame(G.nextLevel); });
   G.ui.e.startb.addEventListener('click', () => startGame(G.level));
   G.ui.e.overb.addEventListener('click', () => startGame(G.level));
-  G.ui.e.menub.addEventListener('click', () => { G.running = false; document.body.classList.remove('playing'); G.ui.hideOver(); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; });
+  G.ui.e.menub.addEventListener('click', () => { G.running = false; document.body.classList.remove('playing'); G.ui.hideOver(); G.ui.setLadder(G.ladder, LADDER, LEVELS); G.ui.setLevel(G.level, LEVELS[G.level].name); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; });
   G.ui.e.mute.addEventListener('click', () => hooks.mute());
 }
 
@@ -137,7 +156,7 @@ const hooks = {
     G.ui.hint(''); G.ui.tossVisible(false); G.serveMarker.visible = false;
   },
   serveNudge(dx) { G.serveOffset = clamp(G.serveOffset + dx, -SERVE.offsetMax, SERVE.offsetMax); },
-  level(key) { if (!G.running) { G.level = key; G.ui.setLevel(key, LEVELS[key].name); } },
+  level(key) { if (!G.running) { G.level = key; G.ui.setLevel(key, LEVELS[key].name); G.arena.applyVenue(venueOf(key)); } },
   restart() { if (G.running || G.match.over) startGame(G.level); },
   mute() { G.audio.init(); G.audio.setMuted(!G.audio.muted); G.ui.e.mute.textContent = G.audio.muted ? 'SOUND OFF' : 'SOUND ON'; },
   menu() { if (!G.running) return; G.running = false; document.body.classList.remove('playing'); G.ui.showStart(); placeIdle(); window.__GAME__.state = 'MENU'; },
@@ -183,6 +202,10 @@ function placeIdle() {
 function startGame(level) {
   G.level = level;
   G.audio.init();
+  if (G.arena.venue !== venueOf(level)) G.arena.applyVenue(venueOf(level));
+  G.audio.musicReset();
+  G.ink = 0; G.cinema = 0; INK.value = 0; G.arena.mood(0, 0);
+  G.mstats = { perfect: 0, topSpeed: 0, topSpin: 0 };
   G.ui.hideStart(); G.ui.hideOver();
   G.ui.setLevel(level, LEVELS[level].name);
   G.match.startGame(1);
@@ -265,6 +288,7 @@ function idle(dt, now) {
   G.arena.crowd.update(dt, 0.1, 0);
   G.arena.atmosphere.update(dt);
   if (G.arena.flip) G.arena.flip.update(dt, null);
+  if (G.ink > 0.001 || G.cinema > 0.001) { G.ink *= Math.exp(-6 * dt); G.cinema *= Math.exp(-4 * dt); INK.value = G.ink < 0.002 ? 0 : G.ink; G.arena.mood(INK.value, G.cinema); G.arena.crowd.hush = 0; }
   G.audio.update(dt, { rally: 0, tension: false, live: false, running: false });
 }
 
@@ -350,7 +374,7 @@ function update(dt, now, realDt) {
   updateTargetRing();
   const tr = match.update(gdt);
   if (tr === 'serve') onNewServe();
-  if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; document.body.classList.remove('playing'); G.ui.showOver(match.winner === 0, match.score, { longestRally: match.longestRally, winners: match.stats.winners, errors: match.stats.errors }); window.__GAME__.state = 'OVER'; } }
+  if (G.overTimer >= 0) { G.overTimer -= dt; if (G.overTimer < 0) { G.overTimer = -1; G.running = false; document.body.classList.remove('playing'); G.ui.showOver(matchReport(), G.audio); window.__GAME__.state = 'OVER'; } }
   // whoosh on a fast swing
   if (paddle.swingT >= 0 && paddle.swingT < 0.02 && G.whooshT < now - 0.2) { G.whooshT = now; }
   // visuals: the player sees the red side of their own blade; the wrist cocks while charging
@@ -372,13 +396,22 @@ function update(dt, now, realDt) {
   G.confetti.update(dt * (G.timeScale || 1));
   G.cloth.update(gdt);
   const rallyLvl = clamp((match.rally - 3) / 12, 0, 1);
+  // ink focus: past a dozen shots the hall drains to pencil; the point snaps the colour back.
+  // match point: the light closes onto the table and the crowd holds its breath.
+  const inkT = match.state === 'IN_PLAY' && match.rally >= INK_RALLY ? 1 : 0;
+  G.ink += (inkT - G.ink) * (1 - Math.exp(-(inkT > G.ink ? 1.5 : 8) * dt));
+  const mp = match.gamePoint() >= 0 && (match.state === 'SERVE_WAIT' || match.state === 'TOSS' || match.state === 'IN_PLAY');
+  G.cinema += ((mp ? 1 : 0) - G.cinema) * (1 - Math.exp(-(mp ? 1.3 : 3.5) * dt));
+  INK.value = G.ink < 0.002 ? 0 : G.ink;
+  G.arena.mood(INK.value, G.cinema);
+  G.arena.crowd.hush = Math.max(G.ink, G.cinema);
   G.arena.crowd.update(dt, 0.15 + rallyLvl * 0.85, 0);
   G.arena.atmosphere.update(dt);
   if (G.arena.flip) G.arena.flip.update(dt, G.audio);
   G.arena.setLevel(rallyLvl);
   G.ui.rally(match.rally);
   const tension = match.gamePoint() >= 0 && match.state !== 'POINT_OVER' && match.state !== 'GAME_OVER';
-  G.audio.update(dt, { rally: match.rally, tension, live: G.ballLive, running: true });
+  G.audio.update(dt, { rally: match.rally, tension, live: G.ballLive, running: true, ink: G.ink, cinema: G.cinema });
 }
 
 /**
@@ -650,6 +683,7 @@ function handleEvent(e, now) {
     case 'paddle': {
       const isPlayer = e.owner === 0;
       const res = match.onEvent(e, now);
+      if (res && (res.serve !== undefined || res.legal !== undefined)) audio.musicHit(e.owner, match.rally, G.cinema > 0.5);
       const timing = isPlayer ? paddle.timing() : { kind: e.quality || 'GOOD' };
       const wasPending = isPlayer && paddle.pending;
       if (wasPending) paddle.cancelSwing();
@@ -677,6 +711,11 @@ function handleEvent(e, now) {
         G.hitLog.push({ q, a, serve: !!(res && res.serve !== undefined), before: +before.toFixed(1), speed: +v.length().toFixed(1), el: +Math.atan2(v.y, Math.hypot(v.x, v.z)).toFixed(3), spin: Math.round(G.ball.w.x), wy: Math.round(G.ball.w.y), wz: Math.round(G.ball.w.z), spin0, wy0, z: +G.ball.p.z.toFixed(2), y: +G.ball.p.y.toFixed(2), pad: +e.padSpeed.toFixed(1),
           swingT: +paddle.swingT.toFixed(3), phase: +timing.phase.toFixed(2), pend: wasPending, sinceSwing: sw ? +(G.time - sw.t).toFixed(3) : null, auto: sw ? sw.auto : null, hold: sw ? +(sw.hold || 0).toFixed(3) : null, tReal: sw ? +(sw.tReal || 0).toFixed(3) : null });
         if (G.hitLog.length > 40) G.hitLog.shift();
+        if (G.mstats) {
+          if (q === 'PERFECT') G.mstats.perfect++;
+          G.mstats.topSpeed = Math.max(G.mstats.topSpeed, v.length());
+          G.mstats.topSpin = Math.max(G.mstats.topSpin, G.ball.w.length());
+        }
       }
       audio.paddle(e.speedIn + e.padSpeed * 0.5, { quality: q, edge: e.edge, slip: e.slip, brush: e.brush });
       fx.impact(e.point, e.normal, q, e.speedOut);
@@ -735,10 +774,11 @@ function handleOutcome(res, now) {
   if (res.legal !== undefined) {
     return;
   }
-  if (res.let) return;
+  if (res.let) { audio.padOff(0.4); return; }
   if (res.point !== undefined) {
     const win = res.point === 0;
     const gp = match.lastPoint && match.lastPoint.gamePoint >= 0;
+    audio.musicPoint(win, match.lastPoint ? match.lastPoint.rally : 0);
     G.confetti.shower(res.point, TABLE.H, !!res.gameOver);
     ui.setScore(match.score, match.server);
     ui.pulseSide(res.point);
@@ -751,6 +791,31 @@ function handleOutcome(res, now) {
     ui.gamePoint(-1);
     if (res.gameOver) { audio.gameOver(win); G.overTimer = 2.4; window.__GAME__.over = true; }
   }
+}
+
+/** The end of a game: the ladder moves, and the report says what happened. */
+function matchReport() {
+  const m = G.match, win = m.winner === 0, level = G.level, i = LADDER.indexOf(level);
+  const next = i >= 0 && i + 1 < LADDER.length ? LADDER[i + 1] : null;
+  let unlocked = null;
+  if (win) {
+    G.ladder.beaten[level] = [m.score[0], m.score[1]];
+    if (next && !G.ladder.open.includes(next)) { G.ladder.open.push(next); unlocked = next; }
+    saveLadder();
+  }
+  G.nextLevel = win && next ? next : null;
+  const st = G.mstats || { perfect: 0, topSpeed: 0, topSpin: 0 };
+  // the two that always print, then only what actually happened
+  const tags = [['LONGEST RALLY', m.longestRally], ['WINNERS', m.stats.winners[0]]];
+  if (m.stats.aces[0] > 0) tags.push(['ACES', m.stats.aces[0]]);
+  if (st.perfect > 0) tags.push(['PERFECT HITS', st.perfect]);
+  if (st.topSpeed > 1) tags.push(['TOP SPEED', `${Math.round(st.topSpeed * 3.6)} KM/H`]);
+  if (st.topSpin > 20) tags.push(['TOP SPIN', `${Math.round(st.topSpin * 9.549)} RPM`]);
+  return {
+    win, score: [m.score[0], m.score[1]], level, opp: LEVELS[level].name, venue: VENUES[venueOf(level)].name,
+    tags, unlocked: unlocked ? LEVELS[unlocked].name : null, next: G.nextLevel ? LEVELS[G.nextLevel].name : null,
+    complete: win && !next,
+  };
 }
 
 const _ringCol = new THREE.Color();
@@ -836,10 +901,11 @@ function updateCamera(dt) {
   const ch = p.charging ? p.charge : 0;
   _camT.copy(G.camBase).add(_a.set(px * 0.05 + bx * 0.04, -0.05 * ch, -0.14 * ch));
   _lookT.copy(G.lookBase).add(_a.set(px * 0.03 + bx * 0.1, 0, 0));
+  if (G.running && G.cinema > 0.001) { _camT.y -= 0.42 * G.cinema; _camT.z -= 0.22 * G.cinema; _lookT.y += 0.1 * G.cinema; }
   const k = 1 - Math.exp(-6 * dt);
   camera.position.lerp(_camT, k); G.look.lerp(_lookT, k);
   const rallyZoom = clamp((G.match.rally - 4) / 12, 0, 1) * 4;
-  const fov = G.fovBase - rallyZoom - ch * 4 + G.camKick + (ch >= 0.999 ? 1.2 * Math.abs(Math.sin(G.time * 9)) : 0);
+  const fov = G.fovBase - rallyZoom - ch * 4 - 2.5 * G.cinema + G.camKick + (ch >= 0.999 ? 1.2 * Math.abs(Math.sin(G.time * 9)) : 0);
   camera.fov += (fov - camera.fov) * (1 - Math.exp(-8 * dt));
   camera.updateProjectionMatrix();
   camera.lookAt(G.look);
@@ -848,6 +914,7 @@ function updateCamera(dt) {
 }
 function resize() {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
+  INK_PX.value = renderer.getPixelRatio();
   camera.aspect = window.innerWidth / window.innerHeight;
   layoutCamera();
   camera.updateProjectionMatrix();
@@ -883,5 +950,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[pong ping] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609212236';
-window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor };
+import { solveShot } from './bots.js?v=202609232250';
+window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor, INK, VENUES, matchReport, startGame, handleOutcome };

@@ -64,6 +64,30 @@ thirteen CPU serves in a row are legal.
 A point is not a word on the screen: confetti in the arena's colours falls on the half that won
 it and settles on the table and the floor beside it.
 
+## Four halls, a song, a pencil
+
+Each opponent plays in a hall of its own, and every hall is the same kit re-dressed: NOVICE in a
+school gym in daylight, with goals on the end walls, tall windows and blue wall pads; ROOKIE in a
+community hall under strip lights, bunting overhead and neighbours on folding chairs; CLUB on a
+wooden floor under low green lamps with two more tables beside yours; PRO in the arena. Picking a
+level on the menu shows its hall behind the menu.
+
+The rally is the music. Every contact that counts plays a note as well as its knock: yours ping,
+the CPU's pong a little lower, and the pair climbs a pentatonic scale one step per exchange. The
+beat is the rally's own tempo: a kick on each hit from the fourth, an off-beat hat from the sixth,
+a bass root under each pong from the eighth, a pad from the twelfth. The point ends the song with
+a crash and an arpeggio before the applause.
+
+Past a dozen shots the hall drains to pencil on paper, hatched in the shade, and only the table,
+the net, the ball and the two blades keep their colour. The point snaps the colour back with the
+confetti. At match point the light closes onto the table, the crowd falls silent under a
+heartbeat, and the camera drops low for the last point.
+
+A game ends in a match report: the winner's name, the score riffling up on two flip cards, a
+rubber stamp on the beaten opponent's card, the numbers that happened as paper tags, and the next
+rung of the ladder unlocked. Beaten levels keep their stamp on the menu. Locked levels show a
+padlock but stay playable, so nobody is kept from the arena.
+
 ## How it was made
 
 - `STYLE.md` is the style lock handed to everything that generated geometry.
