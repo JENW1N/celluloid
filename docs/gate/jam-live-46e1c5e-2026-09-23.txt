@@ -1,0 +1,19 @@
+=== 404 JAM VERDICT ===
+url             https://jenw1n.github.io/celluloid/game/
+utc             2026-09-23T22:51:25.442Z
+commit          46e1c5e8e3dc60a35773c63c3e2b66cf3ebd1f53
+viewport        390x844 @3x phone, real touch, Android Chrome UA
+network         4G: 4 Mbps down, 1 Mbps up, 60 ms latency, CPU 2x slower
+ready           3.7 s   budget 20 s   PASS
+weight          1.7 MB   budget 10 MB   PASS
+started         yes (tap on #startb)
+moved           1.2 m   needs 1 m   PASS
+peak draws      154   budget 900   PASS
+peak tris       289,712   budget 1,500,000   PASS
+median fps      240 (ANGLE (NVIDIA, NVIDIA GeForce RTX 5090 (0x00002B85) Direct3D11 vs_5_0 ps_5_0, D3D11))
+errors          0   PASS
+404s            0   PASS
+external deps   none   cdn: fonts.googleapis.com, fonts.gstatic.com, cdn.jsdelivr.net
+outside folder  none, every file came from the game folder
+RESULT: PASS
+=== END ===
