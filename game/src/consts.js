@@ -47,6 +47,9 @@ export const PALETTE = {
 export const LEEWAY = { approachT: 0.35, magnetT: 0.4 };
 // The ladder the levels are climbed in, and the rally length at which the hall turns to pencil.
 export const LADDER = ['novice', 'rookie', 'club', 'pro'];
+// The CPU stays back: its blade never comes within minNet of the net, and it smashes only from
+// smashFrom or further, at its own end. A short ball that dies before its reach is your point.
+export const BOT_REACH = { minNet: 1.0, smashFrom: 1.3, lungeZ: 0.3 };
 export const INK_RALLY = 12;
 export const LEVELS = {
   novice: { name: 'NOVICE', venue: 'gym', speed: 4.0, react: 0.2, sigma: 0.34, sigmaTheta: 0.06, spd: [4.3, 6.2], spin: [0, 50], smash: false, letsOut: 0, whiff: 0.2, place: 'center', early: 0, serveSpd: [4.0, 4.8], serveSpin: 0, serveToPaddle: true, serveReach: 0.12, serveDepth: [0.65, 0.95], assist: 1.9, assistAngle: 0.45, assistSpin: 420, assistPace: 0.3, assistBoost: 2.4, magnet: 0.85, magnetR: 0.32, magnetMax: 0.16, swingHold: 0.2, autoSwing: true, approachSlow: 0.25, assistYaw: 0.16, wrist: 0.75, slow: 0.8, aim: true },

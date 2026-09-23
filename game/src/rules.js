@@ -5,7 +5,7 @@
  * opponent's side; a serve that clips the net and lands is a let; a ball that passes the far
  * end line without touching the table is out the moment it does.
  */
-import { TABLE } from './consts.js?v=202609232250';
+import { TABLE } from './consts.js?v=202609232318';
 
 export class Match {
   constructor() { this.reset(); }

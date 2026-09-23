@@ -8,8 +8,8 @@
  */
 import * as THREE from 'three';
 const _evB = [];                                   // lent to every flight the bot simulates
-import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, clamp, lerp } from './consts.js?v=202609232250';
-import { BallState, predict, countType } from './physics.js?v=202609232250';
+import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, BOT_REACH, clamp, lerp } from './consts.js?v=202609232318';
+import { BallState, predict, countType } from './physics.js?v=202609232318';
 
 const ZERO = new THREE.Vector3();
 const _b = new BallState(), _v = new THREE.Vector3(), _hand = new THREE.Vector3(), _tmp = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -95,9 +95,9 @@ export class Bot {
     let apex = after[0];
     for (const s of after) if (s.y > apex.y) apex = s;
     const cross = after.find((s) => s.z <= -PLAYER.z0);
-    // the same rule the player lives by: the blade's plane follows the apex but never comes
-    // past the reach line, so the ball is met where it crosses that plane, or not at all
-    const zMeet = clamp(apex.z, -PLAYER.z0, -PLAYER.reachMin);
+    // the blade's plane follows the apex but never comes within a metre of the net, so the ball
+    // is met where it crosses that plane, or not at all
+    const zMeet = clamp(apex.z, -PLAYER.z0, -BOT_REACH.minNet);
     const reach = after.find((s) => s.z <= zMeet);
     const lob = apex.y > TABLE.H + 0.95;
     let pick;
@@ -132,7 +132,7 @@ export class Bot {
     T.z = clamp(T.z + gauss() * cfg.sigma * 0.6, 0.2, 1.3);
     let kind, spd, spin;
     const backspinComing = ball.w.x > 150;
-    if (cfg.smash && (height > 0.32 || lob)) { kind = 'smash'; spd = lob ? rr(18, 24) : rr(20, 27); spin = rr(50, 150); T.z = rr(0.9, 1.3); }
+    if (cfg.smash && (height > 0.32 || lob) && -P.z >= BOT_REACH.smashFrom) { kind = 'smash'; spd = lob ? rr(18, 24) : rr(20, 27); spin = rr(50, 150); T.z = rr(0.9, 1.3); }
     else if (height < 0.06 || (backspinComing && cfg.spin[1] > 0)) { kind = 'loop'; spd = rr(cfg.spd[0], lerp(cfg.spd[0], cfg.spd[1], 0.6)); spin = rr(cfg.spin[0], cfg.spin[1]); }
     else { kind = 'drive'; spd = rr(cfg.spd[0], cfg.spd[1]); spin = rr(cfg.spin[0] * 0.5, cfg.spin[1] * 0.8); }
     const w = new THREE.Vector3(spin, Math.random() < 0.3 ? gauss() * spin * 0.5 : 0, 0);
@@ -159,7 +159,7 @@ export class Bot {
         const dist = _d.length(), step = this.cfg.speed * dt;
         if (dist > 1e-4) this.pos.addScaledVector(_d, Math.min(1, step / dist));
       }
-      if (this.swing < 0 && now >= plan.tc - 0.09) { this.swing = 0; this.swingV.copy(plan.v || _tmp.set(0, 0.2, 1)).normalize(); this.swingPower = plan.miss ? 0.3 : plan.power; }
+      if (this.swing < 0 && now >= plan.tc - 0.09) { this.swing = 0; this.swingV.copy(plan.v || _tmp.set(0, 0.2, 1)).normalize(); this.swingV.z *= BOT_REACH.lungeZ; this.swingPower = plan.miss ? 0.3 : plan.power; }   // the follow-through rises and crosses, it does not reach for the net
       const passed = plan.P.z < -TABLE.halfL && ball.p.z <= plan.P.z + 0.015 && ball.v.z < 0;
       if (!plan.done && (now >= plan.tc || passed)) {
         plan.done = true;
@@ -219,7 +219,7 @@ export class Bot {
     const speedIn = ball.v.length();
     ball.set(ball.p, sol.v, sol.w);
     ev.push({ type: 'paddle', owner: 1, serve: true, speedIn, edge: false, slip: false, rho: 0.2, point: ball.p.clone(), normal: sol.v.clone().normalize(), padSpeed: sol.v.length() * 0.7, brush: 0, spin: sol.w.length(), speedOut: sol.v.length(), quality: 'GOOD', kind: 'serve' });
-    this.swing = 0; this.swingV.copy(sol.v).normalize(); this.swingPower = 0.35;
+    this.swing = 0; this.swingV.copy(sol.v).normalize(); this.swingV.z *= BOT_REACH.lungeZ; this.swingPower = 0.35;
   }
   /** A serve that bounces on our side then the player's: pick the best of a small grid. */
   solveServe(P) {

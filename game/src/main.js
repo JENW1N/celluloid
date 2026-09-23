@@ -6,19 +6,19 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609232250';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, LADDER, INK_RALLY, clamp } from './consts.js?v=202609232250';
-import { INK, INK_PX } from './toon.js?v=202609232250';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609232250';
-import { PlayerPaddle } from './player.js?v=202609232250';
-import { Input } from './input.js?v=202609232250';
-import { Match } from './rules.js?v=202609232250';
-import { Bot } from './bots.js?v=202609232250';
-import { AudioEngine } from './audio.js?v=202609232250';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609232250';
-import { NetCloth } from './netcloth.js?v=202609232250';
-import { buildArena, ASSET_LIST, VENUES } from './arena.js?v=202609232250';
-import { UI } from './ui.js?v=202609232250';
+import { preloadAssets } from '../assetlib.js?v=202609232318';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, LADDER, INK_RALLY, clamp } from './consts.js?v=202609232318';
+import { INK, INK_PX } from './toon.js?v=202609232318';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609232318';
+import { PlayerPaddle } from './player.js?v=202609232318';
+import { Input } from './input.js?v=202609232318';
+import { Match } from './rules.js?v=202609232318';
+import { Bot } from './bots.js?v=202609232318';
+import { AudioEngine } from './audio.js?v=202609232318';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609232318';
+import { NetCloth } from './netcloth.js?v=202609232318';
+import { buildArena, ASSET_LIST, VENUES } from './arena.js?v=202609232318';
+import { UI } from './ui.js?v=202609232318';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -950,5 +950,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[pong ping] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609232250';
+import { solveShot } from './bots.js?v=202609232318';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor, INK, VENUES, matchReport, startGame, handleOutcome };
