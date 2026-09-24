@@ -7,7 +7,7 @@
  * so a fast flick at contact is a brush, and a brush is spin.
  */
 import * as THREE from 'three';
-import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609232318';
+import { PADDLE, PLAYER, SWING, TILT, TABLE, NET, RUBBER, clamp, easeOut, easeInOut } from './consts.js?v=202609240115';
 
 const _din = new THREE.Vector3(), _dout = new THREE.Vector3(), _nb = new THREE.Vector3(), _tgt = new THREE.Vector3(), _t2 = new THREE.Vector2();
 
@@ -28,7 +28,8 @@ export class PlayerPaddle {
     this.magnet = new THREE.Vector2();                     // the leeway drift, added to the target
     this.brush = new THREE.Vector3();                      // the flick memory: the cursor's best recent motion, held then let go
     this.brushGain = PLAYER.brushGain;
-    this.cursor = this.target.clone(); this.cursorPrev = this.target.clone(); this.rawVel = new THREE.Vector3();   // the cursor (or finger) itself, apart from any pull on the target
+    this.cursor = this.target.clone(); this.cursorPrev = this.target.clone(); this.rawVel = new THREE.Vector3();
+    this.spinIntent = new THREE.Vector3();                 // on a serve: the brush the toss's sweep asks for   // the cursor (or finger) itself, apart from any pull on the target
     this.pending = false; this.hold = 0; this.swingStarted = false;
   }
   setTarget(x, y) { this.target.set(clamp(x, -PLAYER.xMax, PLAYER.xMax), clamp(y, PLAYER.yMin, PLAYER.yMax)); this.cursor.copy(this.target); }
@@ -123,6 +124,7 @@ export class PlayerPaddle {
     this.cursorPrev.copy(this.cursor);
     if (this.rawVel.lengthSq() >= this.brush.lengthSq()) this.brush.copy(this.rawVel);
     else this.brush.multiplyScalar(Math.exp(-dt / PLAYER.flickMemory));
+    if (this.spinIntent.lengthSq() > this.brush.lengthSq()) this.brush.copy(this.spinIntent);
     // the wrist: aim at the far side, close when high, open when low
     const yawT = -Math.atan2(this.pos.x, this.pos.z - TILT.aimZ);
     const dy = this.pos.y - TILT.yRef;

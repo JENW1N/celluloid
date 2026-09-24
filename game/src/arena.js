@@ -9,10 +9,10 @@
  * light down onto the table. The crowd bobs with excitement and jumps on a point.
  */
 import * as THREE from 'three';
-import { ASSET } from '../assetlib.js?v=202609232318';
-import { toonify, toonMaterial, hullGeometry, outlineMaterial, inkify } from './toon.js?v=202609232318';
-import { FlipBoard } from './flipboard.js?v=202609232318';
-import { TABLE, PALETTE, clamp } from './consts.js?v=202609232318';
+import { ASSET } from '../assetlib.js?v=202609240115';
+import { toonify, toonMaterial, hullGeometry, outlineMaterial, inkify } from './toon.js?v=202609240115';
+import { FlipBoard } from './flipboard.js?v=202609240115';
+import { TABLE, PALETTE, clamp } from './consts.js?v=202609240115';
 
 export const ASSET_NAMES = ['court_floor', 'table', 'net', 'paddle', 'ball', 'score_display', 'barrier', 'bleacher_block', 'spectator', 'floodlight_truss', 'arena_wall_section', 'umpire_table', 'referee_chair', 'flip_scoreboard', 'ball_bucket', 'towel_box', 'basketball_hoop', 'gym_window', 'wall_pad', 'bunting', 'strip_light', 'pendant_lamp'];
 export const ASSET_LIST = ASSET_NAMES.map((n) => `./assets/${n}.js`);

@@ -7,9 +7,9 @@
  * it smashes a high ball, and whether it takes the ball on the rise.
  */
 import * as THREE from 'three';
-const _evB = [];                                   // lent to every flight the bot simulates
-import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, BOT_REACH, clamp, lerp } from './consts.js?v=202609232318';
-import { BallState, predict, countType } from './physics.js?v=202609232318';
+const _evB = [], _evB2 = [];                                   // lent to every flight the bot simulates
+import { TABLE, BALL, PLAYER, LEVELS, SERVE, TILT, BOT_REACH, clamp, lerp } from './consts.js?v=202609240115';
+import { BallState, predict, countType } from './physics.js?v=202609240115';
 
 const ZERO = new THREE.Vector3();
 const _b = new BallState(), _v = new THREE.Vector3(), _hand = new THREE.Vector3(), _tmp = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -241,7 +241,13 @@ export class Bot {
       const tables = r.events.filter((e) => e.type === 'table');
       if (!tables.length || tables[0].side !== 1) return null;
       const far = tables[1] && tables[1].side === 0 ? Math.abs(tables[1].z - tz2) + Math.abs(tables[1].x - tx) * 0.5 : 2;
-      const clean = tables.length >= 2 && tables[1].side === 0 && !r.events.some((e) => e.type === 'netclip' || (e.type === 'nearmiss' && e.clearance < 0.012)) && Math.abs(tables[1].x) < TABLE.halfW - 0.08 && tables[1].z > 0.15 && tables[1].z < TABLE.halfL - 0.1;
+      let clean = tables.length >= 2 && tables[1].side === 0 && !r.events.some((e) => e.type === 'netclip' || (e.type === 'nearmiss' && e.clearance < 0.012)) && Math.abs(tables[1].x) < TABLE.halfW - 0.08 && tables[1].z > SERVE.botMinDepth && tables[1].z < TABLE.halfL - 0.1;
+      if (clean) {
+        // and it has to come to the player: after its bounce it must carry back to the player's
+        // end before it drops, not check up short with backspin and die by the net
+        const r2 = predict(r.state, { maxT: 1.2, ev: _evB2, until: (b, t, ev) => b.p.z >= SERVE.reachZ || ev.some((x) => x.type === 'table' || x.type === 'floor') });
+        clean = r2.state.p.z >= SERVE.reachZ - 0.02;
+      }
       return { far, clean };
     };
     const consider = (spd, z1, h, w2) => {

@@ -55,8 +55,11 @@ topspin a real stroke would have brushed on). The opponent's serve gets the same
 assist, seen in the mirror, so a bot never faults. Spin does not need a frame-perfect flick: the
 paddle keeps the best flick of the last tenth of a second and brushes with it at contact, so a
 small upward, downward or sideways flick as the ball arrives is topspin, backspin or sidespin
-you can watch curve, and the same flick as you release a toss is a spin serve (a serve keeps its
-spin but never becomes a drive: its pace and lift are capped before the two-bounce assist). Every number is in `LEVELS` in `game/src/consts.js`, and `tools/leeway.mjs`
+you can watch curve. Serving cannot be mistimed: hold to toss, and from the release the blade is
+locked onto the ball and waits for the top of the toss, and a charge held too long fires itself as
+the ball drops. Move the cursor while the ball is up and an arrow on the ball shows the spin you are
+asking for, up for topspin, down for backspin, sideways for sidespin, in the trail's colours. The
+CPU's serves land deep and must carry back to your end, so none dies short of your reach. Every number is in `LEVELS` in `game/src/consts.js`, and `tools/leeway.mjs`
 proves each piece in headless Chrome: a paddle parked 28 cm off the ball still blocks it, an
 early release still hits at the peak, a brush leaves the ball spinning at 100 to 200 rad/s, and
 thirteen CPU serves in a row are legal.

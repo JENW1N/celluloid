@@ -6,19 +6,19 @@
  * fps is from real elapsed time, draws and tris come from the renderer.
  */
 import * as THREE from 'three';
-import { preloadAssets } from '../assetlib.js?v=202609232318';
-import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, LADDER, INK_RALLY, clamp } from './consts.js?v=202609232318';
-import { INK, INK_PX } from './toon.js?v=202609232318';
-import { BallState, stepWorld, predict, countType } from './physics.js?v=202609232318';
-import { PlayerPaddle } from './player.js?v=202609232318';
-import { Input } from './input.js?v=202609232318';
-import { Match } from './rules.js?v=202609232318';
-import { Bot } from './bots.js?v=202609232318';
-import { AudioEngine } from './audio.js?v=202609232318';
-import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609232318';
-import { NetCloth } from './netcloth.js?v=202609232318';
-import { buildArena, ASSET_LIST, VENUES } from './arena.js?v=202609232318';
-import { UI } from './ui.js?v=202609232318';
+import { preloadAssets } from '../assetlib.js?v=202609240115';
+import { TABLE, BALL, FLOOR_Y, PLAYER, SERVE, LEVELS, LEEWAY, SWING, PADDLE, PALETTE, LADDER, INK_RALLY, clamp } from './consts.js?v=202609240115';
+import { INK, INK_PX } from './toon.js?v=202609240115';
+import { BallState, stepWorld, predict, countType } from './physics.js?v=202609240115';
+import { PlayerPaddle } from './player.js?v=202609240115';
+import { Input } from './input.js?v=202609240115';
+import { Match } from './rules.js?v=202609240115';
+import { Bot } from './bots.js?v=202609240115';
+import { AudioEngine } from './audio.js?v=202609240115';
+import { BallVisual, Impacts, Confetti, PaddleTrail } from './fx.js?v=202609240115';
+import { NetCloth } from './netcloth.js?v=202609240115';
+import { buildArena, ASSET_LIST, VENUES } from './arena.js?v=202609240115';
+import { UI } from './ui.js?v=202609240115';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -46,7 +46,7 @@ const G = {
   ndc: new THREE.Vector2(0, -0.2), hasPointer: false, serveOffset: 0, ghosts: [], padHist: [], gameTime: 0, targetRing: null,
   approach: 1, tCross: null, lastSwing: null, lastBotServe: null,
   slow: [], profAssist: 0, profServe: 0, profEv: '', botPending: null, floorHits: 0, lastFloorT: -1,
-  ink: 0, cinema: 0, mstats: null, ladder: null, nextLevel: null,
+  ink: 0, cinema: 0, mstats: null, ladder: null, nextLevel: null, serveLock: false, tossCursor: null, spinArrow: null, assistMinDepth: 0,
 };
 window.__GAME__ = { pos: [0, PLAYER.yNeutral], fps: 60, speed: 0, score: [0, 0], over: false, draws: 0, tris: 0, rally: 0, hits: 0, state: 'LOADING', ball: [0, 0, 0] };
 window.__READY__ = false;
@@ -84,6 +84,18 @@ async function boot() {
   G.cloth = new NetCloth(G.arena.net);
   setupPaddleVisuals();
   // where the ball will cross your paddle plane: a faint ring to put the blade on
+  // the spin to come on a serve: an arrow from the ball the way the sweep goes, in the trail's
+  // colours (orange topspin, cyan backspin, green sidespin), longer the harder the brush
+  {
+    const g = new THREE.Group();
+    const m = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
+    const shaft = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.012), m); shaft.position.x = 0.5;
+    const hs = new THREE.Shape(); hs.moveTo(0, 0.022); hs.lineTo(0.04, 0); hs.lineTo(0, -0.022); hs.closePath();
+    const head = new THREE.Mesh(new THREE.ShapeGeometry(hs), m);
+    g.add(shaft); g.add(head); g.renderOrder = 20; g.visible = false;
+    g.userData = { shaft, head, mat: m };
+    scene.add(g); G.spinArrow = g;
+  }
   G.targetRing = new THREE.Mesh(new THREE.RingGeometry(0.075, 0.088, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, side: THREE.DoubleSide }));
   G.targetRing.visible = false; G.targetRing.renderOrder = 3;
   scene.add(G.targetRing);
@@ -127,7 +139,7 @@ const hooks = {
   chargeStart() {
     if (!G.running) return;
     // holding the button when it is your serve tosses and charges in one gesture
-    if (G.match.state === 'SERVE_WAIT' && G.match.server === 0) hooks.toss();
+    if (G.match.state === 'SERVE_WAIT' && G.match.server === 0) { hooks.toss(); G.tossCursor = G.paddle.cursor.clone(); G.serveLock = false; G.paddle.spinIntent.set(0, 0, 0); }
     if (G.paddle.startCharge()) { G.audio.init(); G.audio.chargeStart(); }
   },
   cancelCharge() {
@@ -140,7 +152,14 @@ const hooks = {
     const serve = G.match.state === 'TOSS';
     // a release made early waits for the ball (the level says how long); the swing's sound and
     // kick come when the blade actually moves, from update()
-    const hold = serve ? 0 : swingHoldFor(G.paddle, G.paddle.peakFor(G.paddle.charge));
+    let hold = serve ? 0 : swingHoldFor(G.paddle, G.paddle.peakFor(G.paddle.charge));
+    if (serve) {
+      // the serve can't be mistimed: a release on the way up waits for the top of the toss, and
+      // from the release the blade is locked onto the ball, so it always meets it
+      const up = Math.max(0, G.ball.v.y) / 9.81;
+      hold = clamp(up / Math.max(0.2, G.focus * (LEVELS[G.level].slow || 1)) - SWING.forwardT / 2, 0, 0.3);
+      G.serveLock = true;
+    }
     if (!serve && !(G.lastSwing && G.lastSwing.auto && G.lastSwing.t === G.time)) G.lastSwing = { auto: false, tCross: G.tCross, hold, t: G.time, focus: G.focus, approach: G.approach };
     G.paddle.release(serve ? SERVE.power : 1, hold);
   },
@@ -227,7 +246,8 @@ function onNewServe() {
   G.ui.gamePoint(m.gamePoint());
   if (m.server === 0) {
     G.serveX = clamp(G.serveX, -SERVE.xMax, SERVE.xMax);
-    G.ui.hint(G.input.touch ? 'HOLD TOSS · LIFT AT THE TOP OF THE TOSS' : 'HOLD CLICK TO TOSS · RELEASE AT THE TOP OF THE TOSS · ← → PLACE');
+    G.ui.hint(G.input.touch ? 'HOLD TOSS · DRAG FOR SPIN · LIFT TO SERVE' : 'HOLD CLICK TO TOSS · MOVE FOR SPIN · RELEASE TO SERVE · ← → PLACE');
+    G.serveLock = false; G.tossCursor = null; G.paddle.spinIntent.set(0, 0, 0);
     G.ui.tossVisible(true);
     G.serveMarker.visible = false;                 // the toss follows the paddle; no marker needed
   } else {
@@ -307,11 +327,21 @@ function update(dt, now, realDt) {
   if (paddle.charging) G.audio.chargeLevel(paddle.charge);
   const serving = match.state === 'TOSS' && match.server === 0;
   if (serving && G.ballLive) {
-    // the blade is drawn to the tossed ball, and the top of the toss is called out
+    // the sweep: where the cursor has gone since the toss is the spin asked for, up for topspin,
+    // down for backspin, sideways for sidespin
+    if (G.tossCursor && (paddle.charging || paddle.pending)) {
+      paddle.spinIntent.set(paddle.cursor.x - G.tossCursor.x, paddle.cursor.y - G.tossCursor.y, 0).multiplyScalar(SERVE.spinSweep);
+      if (paddle.spinIntent.length() > SERVE.spinBrushMax) paddle.spinIntent.setLength(SERVE.spinBrushMax);
+    }
+    // the blade is drawn to the tossed ball, and once released it is locked onto it
     const dx = ball.p.x - paddle.target.x, dy = ball.p.y - paddle.target.y;
-    if (Math.abs(dx) < 0.2 && Math.abs(dy) < 0.24) paddle.nudgeMagnet(dx * 0.65, dy * 0.65);
+    if (G.serveLock) paddle.nudgeMagnet(dx, dy);
+    else if (Math.abs(dx) < 0.3 && Math.abs(dy) < 0.34) paddle.nudgeMagnet(dx * 0.75, dy * 0.75);
     if (!G.apexCued && ball.v.y < 0.35) { G.apexCued = true; G.audio.tick(); G.ballVis.flash(); }
+    // a charge still held as the ball drops back fires itself
+    if (paddle.charging && ball.v.y < -0.9) hooks.release();
   } else G.apexCued = false;
+  updateSpinArrow(serving && G.ballLive && (paddle.charging || paddle.pending));
   // leeway: where the ball will cross the blade's plane, how soon, and what the level makes of it
   const L = LEVELS[G.level];
   let mx = 0, my = 0, approachT = 1;
@@ -365,7 +395,7 @@ function update(dt, now, realDt) {
     const dead = (ball.p.y - BALL.R < FLOOR_Y + 0.01 && ball.v.length() < 0.5) || (G.floorHits >= 4 && match.state !== 'IN_PLAY') || Math.abs(ball.p.x) > 7 || Math.abs(ball.p.z) > 8 || ball.p.y < -1;
     if (dead) {
       if (match.state === 'IN_PLAY') { const o = match.onEvent({ type: 'gone' }, gnow); if (o) handleOutcome(o, gnow); }
-      if (match.state === 'TOSS') { match.tossFailed(); onNewServe(); }
+      if (match.state === 'TOSS') { match.tossFailed(); G.serveLock = false; G.tossCursor = null; G.paddle.spinIntent.set(0, 0, 0); onNewServe(); }
       G.ballLive = false;
     }
   }
@@ -509,7 +539,7 @@ function applyAssistInner(isServe) {
       land = tables[0];
       if (land.side !== 1) return -1;                          // own side
     }
-    const mz = isServe ? 0.2 : 0.12, mx = isServe ? 0.1 : 0.06, me = isServe ? 0.2 : 0.14;
+    const mz = isServe ? (G.assistMinDepth || 0.2) : 0.12, mx = isServe ? 0.1 : 0.06, me = isServe ? 0.2 : 0.14;
     if (land.z > -mz) return -1;                               // too close to the net
     if (Math.abs(land.x) > halfW - mx) { wideSeen = true; return 1; }
     if (land.z < -halfL + me || land.edge) return 1;
@@ -689,7 +719,7 @@ function handleEvent(e, now) {
       if (wasPending) paddle.cancelSwing();
       // the opponent's serve gets the same two-bounce assist a player's serve gets, seen in the
       // mirror: a bot never faults a serve, whatever the toss gave it
-      if (!isPlayer && e.serve && match.state === 'IN_PLAY') { mirrorZ(G.ball); G.lastBotServe = applyAssist(true); mirrorZ(G.ball); }
+      if (!isPlayer && e.serve && match.state === 'IN_PLAY') { mirrorZ(G.ball); G.assistMinDepth = SERVE.botMinDepth; G.lastBotServe = applyAssist(true); G.assistMinDepth = 0; mirrorZ(G.ball); }
       let q = e.edge ? 'EDGE' : e.slip ? 'THIN' : timing.kind;
       if (isPlayer && e.edge) { G.hitLog.push({ q: 'EDGE', a: '-', serve: !!(res && res.serve !== undefined), speed: +G.ball.v.length().toFixed(1), rho: +e.rho.toFixed(2) }); if (G.hitLog.length > 40) G.hitLog.shift(); }
       if (isPlayer && !e.edge && match.state === 'IN_PLAY') {
@@ -769,7 +799,7 @@ function computeReachLater() { reachPending = true; }
 
 function handleOutcome(res, now) {
   const { match, ui, audio, arena } = G;
-  if (res.serve !== undefined) { ui.hint(''); ui.tossVisible(false); G.serveMarker.visible = false; return; }
+  if (res.serve !== undefined) { ui.hint(''); ui.tossVisible(false); G.serveMarker.visible = false; G.serveLock = false; G.tossCursor = null; G.paddle.spinIntent.set(0, 0, 0); return; }
   if (res.tossFailed) { onNewServe(); return; }
   if (res.legal !== undefined) {
     return;
@@ -816,6 +846,23 @@ function matchReport() {
     tags, unlocked: unlocked ? LEVELS[unlocked].name : null, next: G.nextLevel ? LEVELS[G.nextLevel].name : null,
     complete: win && !next,
   };
+}
+
+const _arrowCol = new THREE.Color(), _cTop = new THREE.Color(PALETTE.orange), _cBack = new THREE.Color(PALETTE.cyan), _cSide = new THREE.Color(0x9cff5a);
+function updateSpinArrow(on) {
+  const a = G.spinArrow;
+  if (!a) return;
+  const b = G.paddle.spinIntent, s = b.length();
+  if (!on || s < 0.35) { a.visible = false; return; }
+  a.visible = true;
+  const len = 0.05 + 0.13 * Math.min(1, s / SERVE.spinBrushMax);
+  const { shaft, head, mat } = a.userData;
+  shaft.scale.x = len; shaft.position.x = len / 2 + 0.035; head.position.x = len + 0.035;
+  a.position.set(G.ball.p.x, G.ball.p.y, G.ball.p.z + 0.03);
+  a.rotation.set(0, 0, Math.atan2(b.y, b.x));
+  const v = Math.abs(b.y), h = Math.abs(b.x);
+  _arrowCol.copy(b.y >= 0 ? _cTop : _cBack).lerp(_cSide, h / Math.max(1e-6, h + v));
+  mat.color.copy(_arrowCol);
 }
 
 const _ringCol = new THREE.Color();
@@ -950,5 +997,5 @@ function telemetry() {
 boot().catch((err) => { console.warn('[pong ping] boot failed', err); G.ui.loading(1, 'could not start: ' + (err && err.message)); });
 
 // Debug handles for the console and the gate. Nothing in the game reads these.
-import { solveShot } from './bots.js?v=202609232318';
+import { solveShot } from './bots.js?v=202609240115';
 window.__DBG = { G, predict, BallState, solveShot, THREE, TABLE, PLAYER, applyAssist, hooks, swingHoldFor, INK, VENUES, matchReport, startGame, handleOutcome };
