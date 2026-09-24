@@ -107,6 +107,18 @@ padlock but stay playable, so nobody is kept from the arena.
   it asserts contacts, a landed return and decided points, and writes a filmstrip.
 - `_jam/` and `_gate/` runs are recorded under `docs/`.
 
+## Credits and rights
+
+- Written for this entry by Claude Fable 5.1 and Claude Opus 5.5 in Claude Code, directed by
+  JENW1N. Every 3D object is an asset module in `game/assets/` built from Three.js constructors;
+  every texture is drawn into a canvas at load; every sound is synthesised with WebAudio as it
+  happens. The game folder holds no image, sound, model or music file.
+- Three.js 0.169 (MIT licence), loaded from jsDelivr.
+- Barlow Condensed by Jeremy Tribby (SIL Open Font License 1.1), loaded from Google Fonts.
+- `assetlib.js`, `surfaces.js` and `rig.js` are the 404 recipe's harness files, copied unchanged as
+  the recipe asks. Nothing from any 404 reference game is used.
+- How each of the jam's rules is met, with the evidence for it: [docs/RULES.md](docs/RULES.md).
+
 ## Running the gates locally
 
 ```

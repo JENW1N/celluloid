@@ -1,0 +1,2 @@
+39 module(s), 1 page(s) in ..\celluloid\game
+every module parses, every path stays inside the folder

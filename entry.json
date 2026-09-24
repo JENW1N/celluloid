@@ -16,7 +16,7 @@
   ],
   "own_art": false,
   "own_art_list": [],
-  "what_i_found": "The paddle is a real racket, not a bat: a hollow 2.7 g ball with drag and spin-parameter Magnus lift meets competition rubber modelled as grip, slip and tangential restitution, so a flick of the mouse at contact is a brush and a brush is spin you can see in the ball's band and trail. The levels differ by leeway rather than by the opponent alone: below PRO the paddle drifts toward where the ball will be met, an early release waits so the swing peaks on the ball, and a return that would miss by a little is bent into a legal one, each piece proven by a headless trial script, while PRO gets none of it. The four opponents plan their shots with the same integrator the ball flies by, an order of magnitude apart in reach, reaction and error.",
+  "what_i_found": "The rally is the music: every contact plays a note that climbs a pentatonic scale over a beat locked to the rally's own tempo, and past a dozen shots the whole hall redraws itself in pencil on paper while only the table, the ball and the two blades keep their colour. Underneath is a real racket, not a bat: a 2.7 g ball with drag and Magnus lift meets rubber modelled as grip and slip, so a flick or a sweep of the mouse is spin you can watch curve, and every level meets a nearly-right stroke halfway. Four opponents play in four halls, a school gym, a community hall, a club and an arena, all re-dressed from one kit of Three.js code, and every sound, from the knock of the ball to the crowd, is synthesised from the physics as it happens.",
   "wallet": "later",
   "contact": "CONTACT"
 }
